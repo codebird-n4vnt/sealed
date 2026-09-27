@@ -50,6 +50,11 @@ const memberSchema = new Schema(
   { timestamps: true },
 );
 
+memberSchema.index(
+  { companyId: 1, wallet: 1 },
+  { name: 'one_member_per_wallet_per_company', unique: true, partialFilterExpression: { wallet: { $type: 'string' } } },
+);
+
 const payrollRunSchema = new Schema(
   {
     companyId: { type: Schema.Types.ObjectId, ref: 'Company', required: true, index: true },
@@ -63,6 +68,13 @@ const payrollRunSchema = new Schema(
     heartbeatAt: Date,
   },
   { timestamps: true },
+);
+
+// At most one running payroll run per company: payments from one treasury must go out in order,
+// so two concurrent runs would race on the same balance.
+payrollRunSchema.index(
+  { companyId: 1 },
+  { name: 'one_running_run_per_company', unique: true, partialFilterExpression: { status: 'running' } },
 );
 
 const paymentSchema = new Schema(

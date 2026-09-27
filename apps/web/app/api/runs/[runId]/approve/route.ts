@@ -28,16 +28,23 @@ export const POST = route<{ runId: string }>(async (request, { params }) => {
   if (await PayrollRun.exists({ companyId: company._id, status: 'running' })) {
     throw badRequest('Another payroll run is in progress.');
   }
-  const claimed = await PayrollRun.findOneAndUpdate(
-    { _id: run._id, status: 'draft' },
-    {
-      status: 'running',
-      startedAt: new Date(),
-      heartbeatAt: new Date(),
-      'approval.signature': signature,
-      'approval.wallet': wallet,
-    },
-  );
+  let claimed;
+  try {
+    claimed = await PayrollRun.findOneAndUpdate(
+      { _id: run._id, status: 'draft' },
+      {
+        status: 'running',
+        startedAt: new Date(),
+        heartbeatAt: new Date(),
+        'approval.signature': signature,
+        'approval.wallet': wallet,
+      },
+    );
+  } catch (error) {
+    // The unique index on running runs: another run for this company started meanwhile.
+    if ((error as { code?: number }).code === 11000) throw badRequest('Another payroll run is in progress.');
+    throw error;
+  }
   if (!claimed) throw badRequest('This run was already approved.');
 
   ensureRunWorker(run.id);

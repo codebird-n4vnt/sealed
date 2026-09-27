@@ -30,11 +30,12 @@ export const POST = route<{ token: string }>(async (_, { params }) => {
   if (!member.wallet && (await Member.exists({ companyId: company._id, wallet, _id: { $ne: member._id } }))) {
     throw new HttpError(409, `This wallet is already on the ${company.name} team.`);
   }
-  if (!member.wallet) {
-    member.wallet = wallet;
-    member.status = 'joined';
-    member.joinedAt = new Date();
-    await member.save();
-  }
-  return json({ memberId: member.id, status: member.status });
+  // Claim atomically, so two wallets accepting at once can't both win.
+  const joined = await Member.findOneAndUpdate(
+    { _id: member._id, $or: [{ wallet: { $exists: false } }, { wallet: null }, { wallet }] },
+    { $set: { wallet, ...(member.status === 'invited' ? { status: 'joined', joinedAt: new Date() } : {}) } },
+    { new: true },
+  );
+  if (!joined) throw new HttpError(409, 'This invite was just accepted by another wallet.');
+  return json({ memberId: joined.id, status: joined.status });
 });

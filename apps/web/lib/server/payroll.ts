@@ -2,7 +2,7 @@ import 'server-only';
 
 import type { Address } from '@solana/kit';
 
-import { formatAmount, getConfidentialBalance, payConfidential } from '@sealed/core';
+import { fetchConfidentialTransfers, formatAmount, getConfidentialBalance, payConfidential, tokenAccountAddress } from '@sealed/core';
 
 import { payrollApprovalMessage } from '../siws';
 import { Company, Member, Payment, PayrollRun, type CompanyDoc, type PaymentDoc } from './models';
@@ -116,6 +116,32 @@ async function work(runId: string): Promise<void> {
   await run.save();
 }
 
+/**
+ * For a payment that landed but whose confirmation was lost: the newest transfer from the treasury
+ * into the employee's account that no other payment has claimed.
+ */
+async function findLandedSignature(chain: CompanyChain, payment: PaymentDoc): Promise<string | undefined> {
+  try {
+    const treasury = await tokenAccountAddress(chain.vault.address, chain.mint);
+    const token = await tokenAccountAddress(payment.wallet as Address, chain.mint);
+    const transfers = await fetchConfidentialTransfers(chain.client, { tokenAccount: token, limit: 10 });
+    for (const transfer of transfers) {
+      if (transfer.sourceToken !== treasury || transfer.destinationToken !== token) continue;
+      if (!(await Payment.exists({ signature: transfer.signature }))) return transfer.signature;
+    }
+  } catch {
+    // Best effort: the payment is confirmed either way.
+  }
+  return undefined;
+}
+
+async function confirmLanded(chain: CompanyChain, payment: PaymentDoc) {
+  payment.status = 'confirmed';
+  payment.error = undefined;
+  payment.signature ??= await findLandedSignature(chain, payment);
+  await payment.save();
+}
+
 async function fail(payment: PaymentDoc, error: string) {
   payment.status = 'failed';
   payment.error = error;
@@ -129,12 +155,7 @@ async function settle(company: CompanyDoc, chain: CompanyChain, payment: Payment
   // A previous attempt was interrupted: find out whether it landed before trying again.
   if ((payment.status === 'proving' || payment.status === 'submitted') && payment.treasuryBeforeEnc) {
     const before = decryptAmount(payment.treasuryBeforeEnc);
-    if (available === before - amount) {
-      payment.status = 'confirmed';
-      payment.error = undefined;
-      await payment.save();
-      return;
-    }
+    if (available === before - amount) return confirmLanded(chain, payment);
     if (available !== before) {
       return fail(payment, 'The treasury balance changed while this payment was in flight. Check the explorer before paying again.');
     }
@@ -166,12 +187,7 @@ async function settle(company: CompanyDoc, chain: CompanyChain, payment: Payment
     await payment.save();
   } catch (error) {
     // The transfer may have landed even if confirming it failed (e.g. a timeout).
-    if ((await treasuryAvailable(chain)) === available - amount) {
-      payment.status = 'confirmed';
-      payment.error = undefined;
-      await payment.save();
-      return;
-    }
+    if ((await treasuryAvailable(chain)) === available - amount) return confirmLanded(chain, payment);
     console.error(`Payment ${payment.id} failed:`, error);
     await fail(payment, error instanceof Error ? error.message.split('\n')[0]! : 'Transfer failed.');
   }

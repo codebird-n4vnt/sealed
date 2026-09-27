@@ -72,7 +72,9 @@ EE_ACCT="$(solana-keygen pubkey "$RUN/employee-acct.json")"
 ok "Employer wallet: $EMPLOYER"
 ok "Employee wallet: $EMPLOYEE"
 
-ST=(spl-token -C "$CFG")   # every spl-token call: our config, employer is the fee payer
+# Every spl-token call: our config, and the employer pays the fee. --fee-payer must be explicit:
+# when a command passes --owner, spl-token otherwise makes that owner the fee payer.
+ST=(spl-token -C "$CFG" --fee-payer "$KEYS/employer.json")
 
 solana -C "$CFG" block-height >/dev/null 2>&1 \
   || fail "Can't reach the RPC at '$RPC_URL'. Check your internet (or that Surfpool is running)."
@@ -126,7 +128,7 @@ say "8/9 Employee applies pending balance and withdraws (employer still pays fee
 "${ST[@]}" withdraw-confidential-tokens "$MINT" "$PAY_AMOUNT" --address "$EE_ACCT" --owner "$KEYS/employee.json"
 
 say "9/9 Checking the result"
-EE_PUBLIC="$("${ST[@]}" balance --address "$EE_ACCT" | tail -n1 | tr -d '[:space:]')"
+EE_PUBLIC="$("${ST[@]}" balance --address "$EE_ACCT" | awk 'NF{v=$1} END{print v}')"  # output ends with a blank line
 EE_SOL="$(lamports "$EMPLOYEE")"
 echo "Employee public token balance after withdraw: $EE_PUBLIC (expected $PAY_AMOUNT)"
 

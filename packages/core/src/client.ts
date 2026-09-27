@@ -31,6 +31,11 @@ export type SealedClientConfig = {
   rpcSubscriptionsUrl?: string;
   /** Pays every transaction fee and rent deposit. In Sealed this is always the company. */
   feePayer: TransactionSigner;
+  /**
+   * Simulate each transaction to set its compute-unit limit (default true). Turn off to send
+   * inline-proof transactions, which leave no room for the extra compute-budget instruction.
+   */
+  estimateResourceLimits?: boolean;
 };
 
 /**
@@ -42,7 +47,13 @@ export async function createSealedClient(config: SealedClientConfig) {
   const rpcSubscriptionsUrl = config.rpcSubscriptionsUrl ?? defaultSubscriptionsUrl(rpcUrl);
   return await createClient()
     .use(payer(config.feePayer))
-    .use(solanaRpc({ rpcUrl, ...(rpcSubscriptionsUrl ? { rpcSubscriptionsUrl } : {}) }))
+    .use(
+      solanaRpc({
+        rpcUrl,
+        ...(rpcSubscriptionsUrl ? { rpcSubscriptionsUrl } : {}),
+        transactionConfig: { estimateResourceLimits: config.estimateResourceLimits ?? true },
+      }),
+    )
     .use(token2022Program());
 }
 

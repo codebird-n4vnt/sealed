@@ -21,16 +21,20 @@ import {
   auditTransaction,
   confidentialState,
   createPayrollMint,
+  createRemoteSponsorSigner,
   createSealedClient,
   depositToConfidential,
   deriveKeys,
   fetchAuditedTransfers,
+  fetchReceivedPayments,
   getConfidentialBalance,
   mintTestTokens,
   parseAmount,
   payConfidential,
   resolveRpcUrl,
   setupConfidentialAccount,
+  sponsorTransaction,
+  tokenAccountAddress,
   withdrawConfidential,
   type ConfidentialKeys,
   type Payment,
@@ -46,7 +50,13 @@ const FUND = parseAmount('1000');
 const PAY = parseAmount('250');
 
 describe('confidential payroll, end to end', { timeout: 180_000 }, () => {
+  /** The company's client: the employer (the Payroll Vault signer) pays and signs. */
   let client: SealedClient;
+  /**
+   * The employee's client, as in their browser: the company sponsors fees, but only after the
+   * sponsor policy approves each transaction (in the app, the server runs this check).
+   */
+  let employeeClient: SealedClient;
   let employer: KeyPairSigner;
   let employee: KeyPairSigner;
   let accountant: KeyPairSigner;
@@ -108,9 +118,17 @@ describe('confidential payroll, end to end', { timeout: 180_000 }, () => {
     });
   });
 
-  it('onboards a 0-SOL employee: they sign, the company pays and approves', async () => {
+  it('onboards a 0-SOL employee: they sign, the company sponsors and approves', async () => {
+    salaryAccount = await tokenAccountAddress(employee.address, mint);
+    const policy = { owner: employee.address, token: salaryAccount, mint };
+    employeeClient = await createSealedClient({
+      rpcUrl: RPC_URL,
+      feePayer: createRemoteSponsorSigner(employer.address, wire => sponsorTransaction(wire, employer, policy)),
+      estimateResourceLimits: false,
+    });
+
     treasury = await setupConfidentialAccount(client, { owner: employer, mint, keys: employerKeys });
-    salaryAccount = await setupConfidentialAccount(client, { owner: employee, mint, keys: employeeKeys });
+    await setupConfidentialAccount(employeeClient, { owner: employee, mint, keys: employeeKeys });
     await approveConfidentialAccount(client, { mint, authority: employer, owner: employer.address });
     await approveConfidentialAccount(client, { mint, authority: employer, owner: employee.address });
 
@@ -156,9 +174,21 @@ describe('confidential payroll, end to end', { timeout: 180_000 }, () => {
     expect(history.map(t => [t.signature, t.amount])).toEqual([[payment.signature, PAY]]);
   });
 
+  it('shows the employee their payment history, decrypted locally', async () => {
+    const history = await fetchReceivedPayments(employeeClient, { owner: employee.address, mint, keys: employeeKeys });
+    expect(history).toEqual([expect.objectContaining({ signature: payment.signature, sourceToken: treasury, amount: PAY })]);
+  });
+
   it('lets the employee collect and withdraw, still paying no fees', async () => {
-    await applyPendingBalance(client, { owner: employee, mint, keys: employeeKeys });
-    await withdrawConfidential(client, { owner: employee, mint, keys: employeeKeys, amount: PAY, decimals: DECIMALS });
+    await applyPendingBalance(employeeClient, { owner: employee, mint, keys: employeeKeys });
+    await withdrawConfidential(employeeClient, {
+      owner: employee,
+      mint,
+      keys: employeeKeys,
+      amount: PAY,
+      decimals: DECIMALS,
+      proofDelivery: 'inline', // no record accounts, which the sponsor policy doesn't allow
+    });
 
     const { data } = await fetchToken(client.rpc, salaryAccount);
     expect(data.amount).toBe(PAY);

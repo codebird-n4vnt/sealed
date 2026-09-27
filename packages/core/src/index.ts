@@ -4,4 +4,6 @@ export * from './auditor';
 export * from './client';
 export * from './company';
 export * from './employee';
+export * from './history';
 export * from './keys';
+export * from './sponsor';

@@ -141,6 +141,8 @@ export async function payConfidential(
     /** The employee's wallet address. Their token account must already be configured. */
     to: Address;
     amount: bigint;
+    /** Called once the proofs are generated, just before the first transaction is sent. */
+    onProofsReady?: () => void | Promise<void>;
   },
 ): Promise<Payment> {
   const sourceToken = await tokenAccountAddress(input.from.owner.address, input.mint);
@@ -152,21 +154,21 @@ export async function payConfidential(
 
   // The record-staged range proof leaves room in each transaction for the compute-unit
   // limit the executor sets, so this works with the client's default settings on any RPC.
-  const result = await client.sendTransactions(
-    await getConfidentialTransferWithRecordInstructionPlan({
-      payer: client.payer,
-      rpc: client.rpc,
-      mint: input.mint,
-      sourceToken,
-      sourceTokenAccount,
-      destinationToken,
-      destinationTokenAccount,
-      authority: input.from.owner,
-      amount: input.amount,
-      sourceElgamalKeypair: input.from.keys.elgamal,
-      aesKey: input.from.keys.ae,
-    }),
-  );
+  const plan = await getConfidentialTransferWithRecordInstructionPlan({
+    payer: client.payer,
+    rpc: client.rpc,
+    mint: input.mint,
+    sourceToken,
+    sourceTokenAccount,
+    destinationToken,
+    destinationTokenAccount,
+    authority: input.from.owner,
+    amount: input.amount,
+    sourceElgamalKeypair: input.from.keys.elgamal,
+    aesKey: input.from.keys.ae,
+  });
+  await input.onProofsReady?.();
+  const result = await client.sendTransactions(plan);
   return {
     signature: signatureOfConfidentialInstruction(result, CONFIDENTIAL_TRANSFER_CONFIDENTIAL_TRANSFER_DISCRIMINATOR),
     sourceToken,

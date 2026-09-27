@@ -40,8 +40,12 @@ moved into or out of confidential balances (funding the treasury, withdrawing).
 - **Compliance is built in.** Each company token carries the accountant's auditor key, so every
   transfer also encrypts its amount for the accountant. The auditor key is generated in the admin's
   browser and saved as a file; the server never has it.
-- **Each company has its own token,** with manual approval, so only its team can hold it. On the
-  test networks it's a test stablecoin; in production the Sealed Vault would wrap USDC 1:1.
+- **Each company has its own token,** with manual approval, so only its team can hold it. The
+  **Sealed Vault** program ([`programs/sealed-vault`](programs/sealed-vault)) backs it 1:1 with USDC:
+  `wrap` takes USDC in and mints company tokens, and `unwrap` burns them and pays USDC out. Only
+  the vault can mint, and every instruction checks on-chain that supply equals the USDC held. The
+  web app still funds treasuries with a test token; the vault flow is tested end to end in
+  `packages/core`.
 
 ## Repo layout
 
@@ -49,6 +53,7 @@ moved into or out of confidential balances (funding the treasury, withdrawing).
 |---|---|
 | [`packages/core`](packages/core) | All the Confidential Balances logic: keys, account setup, deposit, pay, collect, withdraw, balance and history decryption, auditor decryption, the sponsor policy. Unit and integration tests. |
 | [`apps/web`](apps/web) | Next.js app: company dashboard, employee portal, accountant view, API, payroll engine, fee sponsor. |
+| [`programs/sealed-vault`](programs/sealed-vault) | Anchor program that backs each company token 1:1 with USDC (`init_company`, `wrap`, `unwrap`). |
 | [`scripts/day1-confidential-transfer.sh`](scripts/day1-confidential-transfer.sh) | The day-1 go/no-go test with the `spl-token` CLI. |
 | [`docs`](docs) | Architecture, pitch, demo script, traction kit, submission notes. |
 | [`CLAUDE.md`](CLAUDE.md) | The full project plan and its milestones. |
@@ -108,6 +113,15 @@ The integration test runs the full flow against a live cluster. A fresh 0-SOL em
 onboarded, the company funds its treasury and pays them, the employee decrypts their pay and history,
 and the accountant decrypts the payment. The employee then collects and withdraws. Every employee
 transaction goes through the sponsor policy.
+
+`pnpm test:integration` also runs the Sealed Vault flow when the program is deployed to the cluster.
+The flow is USDC in, then wrap, then confidential payroll, then withdraw, then unwrap to USDC. It
+also checks that nobody can mint around the vault or redeem against another company's vault.
+
+```bash
+pnpm vault:build                      # needs Anchor 1.1 and the Solana CLI
+pnpm vault:deploy -u localhost        # or -u devnet
+```
 
 The day-1 CLI check is still there too: `bash scripts/day1-confidential-transfer.sh` (devnet by
 default, or `RPC_URL=http://127.0.0.1:8899` for Surfpool).

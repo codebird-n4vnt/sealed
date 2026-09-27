@@ -492,6 +492,20 @@ milestone while the current one is broken.
 - Anchor program: `init_company`, `wrap`, `unwrap`, with the 1:1 backing invariant under test.
 - **Done when** USDC in → confidential payroll → USDC out works on devnet.
 - If time runs short, keep M5 as a clearly labelled design in the pitch and docs, not a half-working demo.
+- **Status (Sep 27): ✅ built and tested on Surfpool; devnet deploy pending.**
+  - The program is at `programs/sealed-vault` (Anchor 1.1.2), with program ID
+    `CTfg335Wow4yDCZGizkDnFk3SCT2GChkNsZVicTgbffm`.
+  - `init_company` only accepts a Token-2022 mint whose mint authority is the company PDA, with
+    zero supply and USDC's decimals.
+  - `wrap` and `unwrap` check supply == USDC held on-chain after every call.
+  - `packages/core/test/integration/vault-flow.test.ts` passes 7/7 against the deployed program:
+    - test USDC in → wrap into the confidential treasury → pay an employee confidentially;
+    - the employee withdraws and unwraps to USDC, still at 0 SOL;
+    - refused: minting around the vault, registering a mint the vault can't control, redeeming
+      against another company's vault, and over-unwrapping.
+  - Rust LiteSVM tests were dropped: that build needed several GB of disk the machine didn't have.
+  - The web app still funds treasuries with test tokens, and the sponsor policy doesn't cover
+    `unwrap` yet, so in the test the company pays its fee directly.
 
 ### M6 — Polish, traction and submission
 

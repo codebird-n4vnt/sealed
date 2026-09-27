@@ -97,11 +97,12 @@
   <text class="body" x="458" y="656">and range proofs for every transfer</text>
   <text class="body" x="446" y="674">• Re-enabled on mainnet June 2026</text>
 
-  <rect class="chain" x="800" y="594" width="340" height="120" rx="10" stroke-dasharray="6 4"/>
-  <text class="title" x="816" y="618">Sealed Vault program (stretch)</text>
+  <rect class="chain" x="800" y="594" width="340" height="120" rx="10"/>
+  <text class="title" x="816" y="618">Sealed Vault program (Anchor)</text>
   <text class="body" x="816" y="640">• Wraps USDC 1:1 into each company's</text>
   <text class="body" x="828" y="656">confidential token, and back</text>
-  <text class="body" x="816" y="674">• Invariant: supply == USDC held</text>
+  <text class="body" x="816" y="674">• Invariant, checked on-chain in every</text>
+  <text class="body" x="828" y="690">instruction: supply == USDC held</text>
 
   <!-- Arrows -->
   <path class="line" d="M330 276 V366"/>

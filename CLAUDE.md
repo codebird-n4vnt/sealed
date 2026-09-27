@@ -465,7 +465,10 @@ milestone while the current one is broken.
 - **Status (Sep 27): ✅ done on Surfpool, in the browser.** A fresh test-wallet identity with 0 SOL
   accepted an invite, set up its private account (the server checked and co-signed the sponsored
   transaction, then approved the account), received 4,200, saw it decrypted with the history,
-  collected it and withdrew 1,000, still at 0 SOL. Devnet run pending.
+  collected it and withdrew 1,000, still at 0 SOL.
+- Devnet: ✅ the same flow in the browser against the seeded devnet company
+  (`sealed_devnet` database, via the RPC proxy). Priya started from a fresh identity with 0 SOL,
+  collected and withdrew, and her history showed 4,200 with its real devnet timestamp.
 
 ### M3 — Company dashboard and payroll engine
 
@@ -482,6 +485,8 @@ milestone while the current one is broken.
   - Crash recovery was checked too. A payment that landed before a crash is marked paid without
     paying again, and its signature is recovered from the chain. One that never landed is retried
     once. The treasury paid exactly the expected total.
+  - Devnet: ✅ a 10-person run approved in the browser completed with all 10 payments confirmed.
+    On Solscan (devnet), Priya's payment shows a ConfidentialTransfer and no amount.
 
 ### M4 — Accountant view
 
@@ -491,6 +496,8 @@ milestone while the current one is broken.
   from the chain with amounts shown as encrypted. With the key file loaded, all 9 amounts of the
   seeded run decrypted correctly (46,400 in total). The CSV's 9 signatures and amounts match the
   run's confirmed payments exactly.
+  - Devnet: ✅ 19 payments (last month's 9 plus today's 10) decrypted to 97,000 sUSD in total.
+    The CSV's 19 signatures match the engine's confirmed payments exactly, with real dates.
 
 ### M5 — Sealed Vault program (stretch)
 
@@ -511,6 +518,10 @@ milestone while the current one is broken.
   - Rust LiteSVM tests were dropped: that build needed several GB of disk the machine didn't have.
   - The web app still funds treasuries with test tokens, and the sponsor policy doesn't cover
     `unwrap` yet, so in the test the company pays its fee directly.
+  - Devnet deploy needs about 1.8 devnet SOL, and devnet airdrops were rate-limited. Fund the
+    deployer from faucet.solana.com, then run
+    `pnpm vault:deploy -u http://127.0.0.1:8898 -k .keys/employer.json`
+    (`RPC_URL=… pnpm test:integration` then runs the vault flow on devnet).
 
 ### M6 — Polish, traction and submission
 

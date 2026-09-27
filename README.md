@@ -17,9 +17,9 @@ network with zero-knowledge proofs.
 Sealed hides amounts and balances, not identities: wallet addresses stay public, and so do amounts
 moved into or out of confidential balances (funding the treasury, withdrawing).
 
-> **Status:** test networks only (devnet or a local mainnet fork). The core flow, the company
-> dashboard, the employee portal and the accountant view all work end to end on a Surfpool mainnet
-> fork. The devnet run is pending an outage of the public devnet RPC.
+> **Status:** test networks only. The core flow, the company dashboard, the employee portal and
+> the accountant view all work end to end on devnet and on a Surfpool mainnet fork. The Sealed Vault
+> program is tested on the mainnet fork; its devnet deploy is pending devnet SOL.
 
 ## How it works
 

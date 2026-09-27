@@ -1,0 +1,19 @@
+# Keypairs and secrets — never commit
+.keys/
+*.keypair.json
+.env
+.env.*
+
+# Build output
+node_modules/
+target/
+dist/
+.next/
+.anchor/
+test-ledger/
+.surfpool/
+
+# OS / editor
+.DS_Store
+.vscode/*
+!.vscode/extensions.json

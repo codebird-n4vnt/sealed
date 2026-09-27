@@ -1,0 +1,38 @@
+{
+  "name": "@sealed/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "seed": "tsx --conditions=react-server --env-file=.env.local scripts/seed-demo.ts"
+  },
+  "dependencies": {
+    "@sealed/core": "workspace:*",
+    "@solana-program/token-2022": "0.19.0",
+    "@solana/kit": "8.3.0",
+    "@solana/react": "8.3.0",
+    "@solana/wallet-standard-features": "1.5.0",
+    "@solana/zk-sdk": "0.5.3",
+    "@wallet-standard/base": "1.1.1",
+    "@wallet-standard/features": "1.1.1",
+    "@wallet-standard/react": "1.0.3",
+    "@wallet-standard/wallet": "1.1.1",
+    "mongoose": "9.10.2",
+    "next": "16.3.6",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "server-only": "0.0.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "^26.6.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "tailwindcss": "4.3.3",
+    "tsx": "4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

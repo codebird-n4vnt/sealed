@@ -9,7 +9,9 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "pnpm -r test",
-    "test:integration": "pnpm -r test:integration"
+    "test:integration": "pnpm -r test:integration",
+    "dev": "pnpm --filter @sealed/web dev",
+    "seed": "pnpm --filter @sealed/web seed"
   },
   "devDependencies": {
     "@types/node": "^26.6.3",

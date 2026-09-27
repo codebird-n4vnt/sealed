@@ -1,0 +1,73 @@
+@import 'tailwindcss';
+
+:root {
+  --bg: #f6f5f1;
+  --surface: #ffffff;
+  --surface-2: #faf9f6;
+  --ink: #1c1917;
+  --muted: #6b645c;
+  --line: #e7e3dc;
+  --wax: #b8492f;
+  --wax-soft: #f7e9e3;
+  --ok: #15803d;
+  --ok-soft: #e8f5ec;
+  --warn: #a15c07;
+  --warn-soft: #fcf3e3;
+  --bad: #b91c1c;
+  --bad-soft: #fdeeee;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #100f0e;
+    --surface: #1a1816;
+    --surface-2: #211e1b;
+    --ink: #f4f1ec;
+    --muted: #a39b93;
+    --line: #2f2b27;
+    --wax: #e27a5a;
+    --wax-soft: #33201a;
+    --ok: #5dd28a;
+    --ok-soft: #16281d;
+    --warn: #f0b458;
+    --warn-soft: #2d2413;
+    --bad: #f47a7a;
+    --bad-soft: #321a1a;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-wax: var(--wax);
+  --color-wax-soft: var(--wax-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--wax-soft);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}

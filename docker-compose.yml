@@ -1,0 +1,11 @@
+# Local MongoDB for the web app: docker compose up -d
+services:
+  mongo:
+    image: mongo:8
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - sealed-mongo:/data/db
+
+volumes:
+  sealed-mongo:

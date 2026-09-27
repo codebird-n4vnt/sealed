@@ -3,6 +3,7 @@
 *.keypair.json
 .env
 .env.*
+!.env.example
 
 # Build output
 node_modules/

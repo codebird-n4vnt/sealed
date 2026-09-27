@@ -101,9 +101,13 @@ const reject = (message: string): never => {
 
 /**
  * Checks a serialized (wire-format) transaction against the sponsorship policy.
- * Throws SponsorPolicyError explaining the first violation.
+ * Throws SponsorPolicyError explaining the first violation. Returns how many new (rent-bearing)
+ * accounts the sponsor would fund, for rate limiting.
  */
-export function checkSponsoredTransaction(wireTransaction: ReadonlyUint8Array, policy: SponsorPolicy): void {
+export function checkSponsoredTransaction(
+  wireTransaction: ReadonlyUint8Array,
+  policy: SponsorPolicy,
+): { newAccounts: number } {
   const transaction = getTransactionDecoder().decode(wireTransaction);
   const message = getCompiledTransactionMessageDecoder().decode(transaction.messageBytes);
 
@@ -195,6 +199,7 @@ export function checkSponsoredTransaction(wireTransaction: ReadonlyUint8Array, p
         reject(`${at}: program ${program} not allowed`);
     }
   }
+  return { newAccounts: createdContextAccounts };
 }
 
 /**

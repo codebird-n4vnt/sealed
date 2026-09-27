@@ -5,8 +5,12 @@ first**, then on Superteam Earn (India track) with the Colosseum links.
 
 | | Deadline |
 |---|---|
-| Colosseum Crypto World's Fair (overall + Solana ecosystem track) | Oct 12, 2026 |
-| Superteam India track | Oct 13, 2026 |
+| Colosseum Crypto World's Fair (overall + Solana ecosystem track) | Oct 12, 2026, 11:59 pm PT (Oct 13, 12:29 pm IST) |
+| Superteam India track | Oct 13, 2026 (submit on Colosseum first) |
+
+Prizes stack: Colosseum track prizes add to the overall awards, and the Superteam India pool pays
+on top of anything won globally. Only work done during the hackathon (from Sep 14) is judged;
+Sealed started on Sep 27, so there's no prior work to disclose.
 
 ## Project name
 
@@ -32,13 +36,15 @@ tax and audit, with CSV export. Everyone else sees that a payment happened, but 
 What's built: the core library (key derivation, confidential transfers, recipient and auditor
 decryption, a fee-sponsorship policy with tests), a company dashboard with resumable payroll runs
 that never pay anyone twice, the employee portal, and the accountant view. It all works end to end
-on test networks.
+on devnet. A Sealed Vault program backs each company token 1:1 with USDC (tested on a mainnet fork).
 
 ## Links
 
 - GitHub: https://github.com/codebird-n4vnt/sealed
-- Demo video: **[link]**
-- Pitch video / deck: **[link]**
+- Presentation (pitch) video, 2–3 minutes: **[link]**
+- Product demo video, at most 3 minutes: **[link]**
+- Deck: **[link]** (a draft deck was made alongside the code; share it before linking)
+- Logo: `docs/logo.png` (512 × 512) or `docs/logo.svg`
 - Live devnet demo: **[URL, once deployed]**
 - Colosseum project: **[link]**
 - Colosseum profile: **[link]**
@@ -49,7 +55,11 @@ on test networks.
 - [ ] Colosseum project created, **country = India**, pre-existing work disclosed (none: started
       Sep 27, 2026).
 - [ ] The repo is public, and the README covers setup, architecture and running the demo.
-- [ ] Demo video and pitch video recorded (check the current length and format rules).
+- [ ] Presentation video (2–3 min) and product demo video (≤ 3 min) recorded, in English. Judges
+      watch the presentation video early, so make it clear and well produced.
+- [ ] Weekly one-minute update videos on the Colosseum dashboard (optional, strongly recommended).
+- [ ] The portal also asks for teammates' backgrounds, location, chains and tools, go-to-market,
+      demand validation and distribution. Use `docs/pitch.md` and `docs/traction.md`.
 - [ ] Deck exported (see `docs/pitch.md`).
 - [ ] Live devnet demo deployed and seeded.
 - [ ] Traction section filled with real numbers (`docs/traction.md`).

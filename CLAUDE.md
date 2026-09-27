@@ -591,11 +591,34 @@ The founder is solo and physically based in India.
 
 | Track | Prize | Deadline | Requirements |
 |---|---|---|---|
-| **Colosseum Crypto World's Fair — overall** | $30k grand + 20 × $15k; winners interviewed for the accelerator ($250k pre-seed) | **Oct 12, 2026** | All chains compete in one pool, judged by the Colosseum team on product merit |
+| **Colosseum Crypto World's Fair — overall** | $30k grand + 20 × $15k; winners interviewed for the accelerator ($250k pre-seed) | **Oct 12, 2026, 11:59 pm PT (Oct 13, 12:29 pm IST)** | All chains compete in one pool, judged by the Colosseum team on product merit |
 | **Colosseum — Solana ecosystem track** | 10 × $10k ($100k pool) | Oct 12, 2026 | Same submission |
 | **Superteam India track** | $2.5k / $1.5k / $1k + Superteam India Member role | **Oct 13, 2026** | Solana only; team physically in India; **India selected as country on Colosseum**; submit on Colosseum **and** Superteam Earn |
-| University Prize | $5k | Oct 12, 2026 | Only if the team qualifies; check the rules |
+| University Prize | $5k | Oct 12, 2026 | Eligibility not defined in the rules or FAQ; ask Colosseum |
+| Public Goods Award | $5k | Oct 12, 2026 | Listed in the official rules; no separate entry described |
 | CertiK / Adevar audit credits | credits | see listings | Useful for the Vault program before mainnet |
+
+What the official sources say (checked Sep 27, 2026, from the rules PDF, the FAQ and the Superteam listing):
+
+- **Prizes stack.** Track prizes are "awarded in addition" to the overall awards. The Superteam
+  India pool pays "on top of anything you win globally". It pays in USDG; Colosseum pays in Phantom
+  CASH.
+- **Superteam India eligibility:** built on Solana, team based in India, registered on Colosseum
+  with India as the country, submitted to both Colosseum and Earn, and eligible under the global
+  rules. Only 4 submissions so far.
+- **Colosseum submission portal asks for:**
+  - name and description, chains and tools, teammates' backgrounds, location, and a logo;
+  - the GitHub repo (public encouraged);
+  - a **2–3 minute presentation video** (one of the first things judges watch);
+  - a **product demo video of at most 3 minutes**;
+  - go-to-market, demand validation and distribution plans.
+- **Weekly updates:** a one-minute video each week, optional but "strongly recommended".
+- **Pre-existing work:** only work done during the hackathon (Sep 14 – Oct 12) is judged, and past
+  work must be disclosed. Sealed started Sep 27, so there's nothing prior to disclose. Content must
+  be in English. One project per person.
+- **Judging:** founder–market fit, insight, product and execution, market size, communication,
+  viability and traction. The rules also list functionality, impact, novelty, UX, open source and
+  composability, and the business plan. A shortlist gets a 15-minute Zoom interview.
 
 **Not entering:** the Panta API sidetrack. It requires meaningful Panta API integration, and
 Sealed doesn't use Panta.
@@ -614,13 +637,14 @@ Sealed doesn't use Panta.
 
 - [ ] Colosseum project created, **country = India**, and all past or pre-existing work disclosed.
 - [ ] Public GitHub repo with a README (setup, architecture, how to run the demo).
-- [ ] Pitch video and technical demo video (check Colosseum's current length and format rules).
+- [ ] Pitch video (2–3 min) and product demo video (≤ 3 min), in English.
+- [ ] Weekly one-minute update videos on the Colosseum dashboard (recommended).
 - [ ] Pitch deck: problem, solution, demo screenshots, why now, market, traction, business model, roadmap, team.
 - [ ] Live devnet demo URL.
 - [ ] Colosseum submission confirmed → **then** submit on Superteam Earn (India track) with the
       Colosseum project link, profile link and GitHub link.
-- [ ] Check the Superteam Earn FAQ entry "Can I submit my project to multiple Sidetracks?"
-      before adding any other sidetrack.
+- [x] Stacking: the Superteam India pool pays on top of global prizes, and track prizes add to
+      the overall awards. Still check the Earn FAQ before adding any *other* sidetrack.
 
 ---
 
@@ -674,7 +698,18 @@ Sealed doesn't use Panta.
 
 ## 19. Open questions (resolve early, then update this file)
 
-- [ ] Does `ConfigureAccountWithRegistry` allow company-provisioned employee accounts after a one-time key registration?
+- [x] Does `ConfigureAccountWithRegistry` allow company-provisioned employee accounts after a one-time key registration?
+  - Yes, by design (read from the JS client and the Token-2022 processor source, not tested yet).
+  - The instruction takes only the token account, the mint, the owner's ElGamal registry account and
+    an optional payer. There is no owner signature: the pubkey-validity proof was checked once when
+    the registry account was created.
+  - So an employee registers once (the `spl-elgamal-registry` program, a Rust crate in the
+    token-2022 repo, with no JS client on npm yet). After that, the company can create and configure
+    their token account for any company token without them signing.
+  - Catch: the account starts with an all-zero "decryptable available balance" (the program can't
+    encrypt with the owner's AES key). Clients must read all-zero as 0 until the owner's first
+    apply-pending writes a real ciphertext.
+  - Worth adopting after the hackathon: one employee setup covers every company that pays them.
 - [x] Exact auditor-decryption API in `@solana/zk-sdk` (decrypting the lo/hi transfer-amount ciphertexts).
   - Decode the transfer's instruction data with `getConfidentialTransferInstructionDataDecoder`
     (from `@solana-program/token-2022`).
@@ -687,10 +722,20 @@ Sealed doesn't use Panta.
   - Browser: account setup, collect and withdraw each finished within a few seconds on Surfpool
     (not precisely timed yet).
 - [ ] Can v1 transactions carry a whole confidential transfer in one transaction with current tooling?
-- [ ] PYUSD on-chain confidential config: approve policy and auditor.
+- [x] PYUSD on-chain confidential config: approve policy and auditor.
+  - Read on mainnet (Sep 27, 2026):
+    - approve policy `manual` (Paxos approves every confidential account);
+    - audits disabled (no auditor key, so no accountant view);
+    - the confidential transfer-fee extension (currently 0 bps, but transfers must use the
+      with-fee instruction);
+    - a Paxos permanent delegate.
+  - Conclusion: PYUSD can't give Sealed its per-company auditor or open onboarding without Paxos.
+    The per-company token backed 1:1 through the Sealed Vault stays the path (§9).
 - [x] Does the CLI's key derivation match `solana-conf-bal/v1`? (It affects whether CLI-configured accounts are usable in the app.)
   - Yes, byte for byte (see §7 Keys).
-- [ ] University Prize eligibility for a solo student; Colosseum video requirements; sidetrack stacking rules.
+- [x] Colosseum video requirements; sidetrack stacking rules. (Answers are in §14.)
+- [ ] University Prize eligibility for a solo student. Neither the official rules nor the FAQ
+      define it; ask Colosseum (hackathon@colosseum.com or Discord).
 
 ---
 

@@ -11,7 +11,7 @@ import { GroupedElGamalCiphertext3Handles, type ElGamalSecretKey } from '@solana
 import { signatureOfConfidentialInstruction, tokenAccountAddress } from './accounts';
 import { TRANSFER_AMOUNT_LO_BIT_LENGTH } from './auditor';
 import type { SealedClient } from './client';
-import { fetchConfidentialTransfers, fetchDecodedTransaction } from './history';
+import { fetchConfidentialTransfers, fetchDecodedTransaction, withReadRetry } from './history';
 import type { ConfidentialKeys } from './keys';
 import { ZK_ELGAMAL_PROOF_PROGRAM_ADDRESS } from './sponsor';
 
@@ -99,9 +99,9 @@ export async function decryptReceivedAmount(
   client: SealedClient,
   input: { contextAccount: Address; elgamalSecret: ElGamalSecretKey },
 ): Promise<bigint | null> {
-  const signatures = await client.rpc
-    .getSignaturesForAddress(input.contextAccount, { limit: 10, commitment: 'confirmed' })
-    .send();
+  const signatures = await withReadRetry(() =>
+    client.rpc.getSignaturesForAddress(input.contextAccount, { limit: 10, commitment: 'confirmed' }).send(),
+  );
   for (const { signature, err } of [...signatures].reverse()) {
     if (err) continue;
     const transaction = await fetchDecodedTransaction(client, signature);

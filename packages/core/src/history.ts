@@ -7,6 +7,21 @@ import { getBase58Encoder, type Address, type Signature } from '@solana/kit';
 import { isConfidentialInstructionData } from './accounts';
 import type { SealedClient } from './client';
 
+/**
+ * Retries a chain read. Public RPCs (devnet especially) intermittently fail history queries,
+ * e.g. "Failed to query long-term storage", and reads are safe to repeat.
+ */
+export async function withReadRetry<T>(read: () => Promise<T>, attempts = 4): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await read();
+    } catch (error) {
+      if (attempt >= attempts) throw error;
+      await new Promise(resolve => setTimeout(resolve, 750 * 2 ** (attempt - 1)));
+    }
+  }
+}
+
 export type DecodedInstruction = { programAddress: Address; accounts: Address[]; data: Uint8Array };
 
 export type DecodedTransaction = {
@@ -18,10 +33,14 @@ export type DecodedTransaction = {
 
 /** Fetches a confirmed transaction with its top-level instructions resolved to addresses. */
 export async function fetchDecodedTransaction(client: SealedClient, signature: Signature): Promise<DecodedTransaction> {
-  const transaction = await client.rpc
-    .getTransaction(signature, { encoding: 'json', maxSupportedTransactionVersion: 0, commitment: 'confirmed' })
-    .send();
-  if (!transaction) throw new Error(`Transaction ${signature} not found.`);
+  // A just-confirmed transaction can take a moment to be served, so "not found" is retried too.
+  const transaction = await withReadRetry(async () => {
+    const result = await client.rpc
+      .getTransaction(signature, { encoding: 'json', maxSupportedTransactionVersion: 0, commitment: 'confirmed' })
+      .send();
+    if (!result) throw new Error(`Transaction ${signature} not found.`);
+    return result;
+  });
 
   const { message } = transaction.transaction;
   const loaded = transaction.meta?.loadedAddresses;
@@ -88,9 +107,9 @@ export async function fetchConfidentialTransfers(
   client: SealedClient,
   input: { tokenAccount: Address; limit?: number },
 ): Promise<ConfidentialTransferRecord[]> {
-  const signatures = await client.rpc
-    .getSignaturesForAddress(input.tokenAccount, { limit: input.limit ?? 100, commitment: 'confirmed' })
-    .send();
+  const signatures = await withReadRetry(() =>
+    client.rpc.getSignaturesForAddress(input.tokenAccount, { limit: input.limit ?? 100, commitment: 'confirmed' }).send(),
+  );
   const transfers: ConfidentialTransferRecord[] = [];
   for (const { signature, err } of signatures) {
     if (err) continue;

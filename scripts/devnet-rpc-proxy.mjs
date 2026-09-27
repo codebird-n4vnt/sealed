@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // A local devnet RPC that splits traffic between two public endpoints, with retries.
 //
-// Why: api.devnet.solana.com has been timing out on account reads (getAccountInfo and friends)
-// while everything else works, and free alternative RPCs rate-limit the bursts that
-// confidential-transfer proofs cause. This sends account reads to ACCOUNTS_RPC and everything else
+// Why: api.devnet.solana.com has been timing out on account reads (getAccountInfo and friends) and
+// failing history queries that need its long-term storage ("Failed to query long-term storage"),
+// while everything else works; free alternative RPCs rate-limit the bursts that confidential
+// transfer proofs cause. This sends account and history reads to READS_RPC and everything else
 // (sending transactions, blockhashes, statuses, airdrops) to MAIN_RPC.
 //
 // Usage:
@@ -17,8 +18,15 @@ import { createServer } from 'node:http';
 
 const PORT = Number(process.env.PORT ?? 8898);
 const MAIN_RPC = process.env.MAIN_RPC ?? 'https://api.devnet.solana.com';
-const ACCOUNTS_RPC = process.env.ACCOUNTS_RPC ?? 'https://solana-devnet.api.onfinality.io/public';
-const ACCOUNT_READS = new Set(['getAccountInfo', 'getMultipleAccounts', 'getProgramAccounts', 'getTokenAccountsByOwner']);
+const READS_RPC = process.env.READS_RPC ?? 'https://solana-devnet.api.onfinality.io/public';
+const READS = new Set([
+  'getAccountInfo',
+  'getMultipleAccounts',
+  'getProgramAccounts',
+  'getTokenAccountsByOwner',
+  'getSignaturesForAddress',
+  'getTransaction',
+]);
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -63,7 +71,7 @@ createServer(async (request, response) => {
   try {
     const payload = JSON.parse(body);
     const methods = (Array.isArray(payload) ? payload : [payload]).map(call => call.method);
-    if (methods.every(method => ACCOUNT_READS.has(method))) upstream = ACCOUNTS_RPC;
+    if (methods.every(method => READS.has(method))) upstream = READS_RPC;
   } catch {
     // Not JSON: let the main RPC answer.
   }
@@ -71,5 +79,5 @@ createServer(async (request, response) => {
   response.writeHead(status, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' });
   response.end(text);
 }).listen(PORT, '127.0.0.1', () => {
-  console.log(`Devnet RPC proxy on http://127.0.0.1:${PORT} (reads: ${ACCOUNTS_RPC}, rest: ${MAIN_RPC})`);
+  console.log(`Devnet RPC proxy on http://127.0.0.1:${PORT} (reads: ${READS_RPC}, rest: ${MAIN_RPC})`);
 });

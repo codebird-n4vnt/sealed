@@ -7,3 +7,4 @@ export * from './employee';
 export * from './history';
 export * from './keys';
 export * from './sponsor';
+export * from './vault';

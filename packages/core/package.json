@@ -23,6 +23,7 @@
     "@solana/zk-sdk": "0.5.3"
   },
   "devDependencies": {
+    "@solana-program/token": "0.17.0",
     "vitest": "^5.0.2"
   }
 }

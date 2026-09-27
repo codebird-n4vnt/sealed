@@ -112,6 +112,9 @@ importers:
         specifier: 0.5.3
         version: 0.5.3
     devDependencies:
+      '@solana-program/token':
+        specifier: 0.17.0
+        version: 0.17.0(@solana/kit@8.3.0(typescript@7.0.2))
       vitest:
         specifier: ^5.0.2
         version: 5.0.2(@types/node@26.6.3)(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
@@ -651,6 +654,11 @@ packages:
     peerDependenciesMeta:
       '@solana/zk-sdk':
         optional: true
+
+  '@solana-program/token@0.17.0':
+    resolution: {integrity: sha512-l7EhF3lCWXXdOllGI8qnbF4Pj7pCT/5zJTW2lPsNUQfa7G28pnFhSssHW2GCW7dzGttSHgPdJYdQRB5rvQoN9Q==}
+    peerDependencies:
+      '@solana/kit': ^8.3.0
 
   '@solana-program/zk-elgamal-proof@0.4.0':
     resolution: {integrity: sha512-bf2Q3f25xcCNaLm/MR4lwoAguJzEW2eeLdrJb6rUjMcA63qcgyJOWl6To7Bn4e+0OyWBa+J7YP2BUhi//VPz3g==}
@@ -2270,6 +2278,11 @@ snapshots:
       '@solana/sysvars': 8.3.0(typescript@7.0.2)
     optionalDependencies:
       '@solana/zk-sdk': 0.5.3
+
+  '@solana-program/token@0.17.0(@solana/kit@8.3.0(typescript@7.0.2))':
+    dependencies:
+      '@solana-program/system': 0.15.0(@solana/kit@8.3.0(typescript@7.0.2))
+      '@solana/kit': 8.3.0(typescript@7.0.2)
 
   '@solana-program/zk-elgamal-proof@0.4.0(@solana/kit@8.3.0(typescript@7.0.2))':
     dependencies:

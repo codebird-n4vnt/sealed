@@ -11,7 +11,9 @@
     "test": "pnpm -r test",
     "test:integration": "pnpm -r test:integration",
     "dev": "pnpm --filter @sealed/web dev",
-    "seed": "pnpm --filter @sealed/web seed"
+    "seed": "pnpm --filter @sealed/web seed",
+    "vault:build": "anchor build",
+    "vault:deploy": "solana program deploy target/deploy/sealed_vault.so --program-id target/deploy/sealed_vault-keypair.json"
   },
   "devDependencies": {
     "@types/node": "^26.6.3",

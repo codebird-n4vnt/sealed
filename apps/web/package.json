@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@sealed/core": "workspace:*",
+    "@solana-program/system": "0.15.0",
     "@solana-program/token-2022": "0.19.0",
     "@solana/kit": "8.3.0",
     "@solana/react": "8.3.0",

@@ -79,6 +79,31 @@ Generate `DATA_ENCRYPTION_KEY` with:
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
+### On devnet
+
+Set `NEXT_PUBLIC_SOLANA_CLUSTER=devnet`. A private devnet RPC (Helius, Triton, QuickNode) is the
+most reliable choice. With the public one: on Sep 27, 2026, `api.devnet.solana.com` failed account
+reads and deep history queries while everything else worked. For that case there's a local proxy
+that routes those calls to a second public RPC and paces requests:
+
+```bash
+node scripts/devnet-rpc-proxy.mjs          # http://127.0.0.1:8898
+```
+
+Then, in `apps/web/.env.local`:
+
+```
+NEXT_PUBLIC_RPC_URL=http://127.0.0.1:8898
+NEXT_PUBLIC_RPC_SUBSCRIPTIONS_URL=wss://api.devnet.solana.com
+```
+
+Devnet airdrops are often rate-limited. To seed the demo company, fund its vault from a local wallet
+that holds devnet SOL (about 0.3 SOL is enough):
+
+```bash
+pnpm seed --fund-from ../../.keys/employer.json
+```
+
 ### Wallets
 
 Sealed works with Wallet Standard wallets that support devnet (Phantom, Solflare, Backpack). For
@@ -94,7 +119,8 @@ pnpm seed
 
 This creates **Acme DAO** with a 10-person team: nine people fully onboarded and paid last month, and
 Priya invited but not onboarded, so her onboarding can be shown live. It prints the dashboard link and
-Priya's invite link. It also writes these files to `.keys/demo/` (gitignored):
+Priya's invite link. It also writes these files to `.keys/demo/`, or `.keys/demo-devnet/` on devnet
+(both gitignored):
 - the auditor key file for the accountant view;
 - `test-wallet-identities.json` with the admin and the accountant. Import it from the wallet menu
   (**Import identities from a file**).

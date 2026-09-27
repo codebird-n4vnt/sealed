@@ -4,12 +4,14 @@
  * - Nine people are fully onboarded (private accounts configured, sponsored and approved), and
  *   last month's payroll run is already paid to them, so the accountant view has history.
  * - Priya is invited but not onboarded, so the video can show her joining with 0 SOL.
- * - Wallets and the auditor key are written to .keys/demo/ (gitignored). The admin and accountant
- *   are also written as test-wallet identities, to import in the browser's test wallet menu.
+ * - Wallets and the auditor key are written to .keys/demo/ (.keys/demo-devnet/ on devnet;
+ *   gitignored). The admin and accountant are also written as test-wallet identities, to import
+ *   in the browser's test wallet menu.
  *
  * Usage (from the repo root, with MongoDB and the cluster running):
  *   pnpm seed
  *   pnpm seed --admin <ADDRESS> --accountant <ADDRESS>   # your own wallets; skips the paid history
+ *   pnpm seed --fund-from ../../.keys/employer.json       # fund the vault from a wallet, not an airdrop
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -21,9 +23,11 @@ import {
   getAddressEncoder,
   isAddress,
   signBytes,
+  type Address,
   type KeyPairSigner,
 } from '@solana/kit';
 import { ElGamalKeypair } from '@solana/zk-sdk/bundler';
+import { getTransferSolInstruction } from '@solana-program/system';
 import mongoose from 'mongoose';
 
 import {
@@ -35,6 +39,7 @@ import {
   sponsorTransaction,
   tokenAccountAddress,
 } from '@sealed/core';
+import { loadKeypairSigner } from '@sealed/core/node';
 
 import { connectDb } from '../lib/server/db';
 import { env } from '../lib/server/env';
@@ -71,11 +76,13 @@ const { values: args } = parseArgs({
     admin: { type: 'string' },
     accountant: { type: 'string' },
     name: { type: 'string', default: 'Acme DAO' },
+    'fund-from': { type: 'string' },
+    'fund-sol': { type: 'string', default: '0.3' },
     'app-url': { type: 'string', default: 'http://localhost:3000' },
   },
 });
 
-const KEYS = join(import.meta.dirname, '..', '..', '..', '.keys', 'demo');
+const KEYS = join(import.meta.dirname, '..', '..', '..', '.keys', env.cluster === 'devnet' ? 'demo-devnet' : 'demo');
 const slug = (text: string) => text.normalize('NFD').replace(/[^\w\s-]/g, '').trim().toLowerCase().replace(/\s+/g, '-');
 const log = (message: string) => console.log(`\x1b[36m›\x1b[0m ${message}`);
 
@@ -136,15 +143,28 @@ async function main() {
   );
 
   log(`Funding the payroll vault ${company.vault.address} with test SOL`);
-  for (let attempt = 0; attempt < 3 && (await vaultSol(company)) < 500_000_000n; attempt++) {
-    await airdropToVault(company).catch(() => {});
+  if (args['fund-from']) {
+    // Devnet airdrops are rate-limited; move SOL from a funded local wallet instead.
+    const funder = await loadKeypairSigner(args['fund-from']);
+    const client = await createSealedClient({ rpcUrl: env.rpcUrl, rpcSubscriptionsUrl: env.rpcSubscriptionsUrl, feePayer: funder });
+    await client.sendTransaction(
+      getTransferSolInstruction({
+        source: funder,
+        destination: company.vault.address as Address,
+        amount: BigInt(Math.round(Number(args['fund-sol']) * 1e9)),
+      }),
+    );
+  } else {
+    for (let attempt = 0; attempt < 3 && (await vaultSol(company)) < 500_000_000n; attempt++) {
+      await airdropToVault(company).catch(() => {});
+    }
   }
-  if ((await vaultSol(company)) < 200_000_000n) {
+  if ((await vaultSol(company)) < 100_000_000n) {
     log(`The airdrop was rate-limited. Send 1 devnet SOL to ${company.vault.address} (faucet.solana.com). Waiting up to 10 minutes…`);
-    for (let i = 0; i < 120 && (await vaultSol(company)) < 200_000_000n; i++) {
+    for (let i = 0; i < 120 && (await vaultSol(company)) < 100_000_000n; i++) {
       await new Promise(resolve => setTimeout(resolve, 5_000));
     }
-    if ((await vaultSol(company)) < 200_000_000n) throw new Error('The payroll vault was not funded.');
+    if ((await vaultSol(company)) < 100_000_000n) throw new Error('The payroll vault was not funded.');
   }
 
   log('Creating the company token and confidential treasury');

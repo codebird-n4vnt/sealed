@@ -429,10 +429,14 @@ milestone while the current one is broken.
 - `scripts/day1-confidential-transfer.sh` runs end to end on devnet: an employer pays an
   employee confidentially, the employee withdraws, and the employer pays all fees.
 - **Done when** the script prints GO. If it can't, stop and report before building anything else.
-- **Status (Sep 27): GO on Surfpool (mainnet fork, live Token-2022 and proof program); devnet
-  run pending.** Devnet's public RPC was timing out on every `getAccountInfo` all day, while
-  other methods worked, so this is an RPC outage, not a product failure. Rerun on devnet once
-  it recovers. The run also fixed two script bugs: the fee payer and the balance check.
+- **Status (Sep 27): ✅ GO on Surfpool and on devnet.**
+  - `api.devnet.solana.com` failed two kinds of calls all day: account reads (`getAccountInfo`
+    timed out) and history queries that reach its long-term storage. Everything else worked.
+  - `scripts/devnet-rpc-proxy.mjs` routes those reads to OnFinality's public devnet RPC and the
+    rest to the official RPC, pacing requests to avoid rate limits. Through it the script prints
+    GO on devnet.
+  - On Solscan (devnet), the payment shows as a Token-2022 ConfidentialTransfer with no amount.
+  - The first run also fixed two script bugs: the fee payer and the balance check.
 
 ### M1 — Core library (`packages/core`)
 
@@ -450,7 +454,8 @@ milestone while the current one is broken.
     employee's payment history is decrypted from chain data.
   - `pnpm test` runs 49 unit tests: amounts, the auditor's lo/hi split, and the sponsor policy
     (the allowed employee flows and the attacks it must refuse).
-  - Devnet run pending, as for M0.
+  - Devnet: ✅ 9/9 through the proxy
+    (`RPC_URL=http://127.0.0.1:8898 RPC_SUBSCRIPTIONS_URL=wss://api.devnet.solana.com`).
 
 ### M2 — Employee portal
 

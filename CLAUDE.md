@@ -366,6 +366,11 @@ auditor can be set), and it's documented as not yet deployed on mainnet.
 **Fee sponsorship**
 - The backend builds employee transactions with the company's fee payer and partially signs them.
 - The employee's wallet signs as owner, then the transaction is submitted.
+- **As built (Sep 27): the other way round.** The employee's browser builds each transaction,
+  because the proofs need the employee's secret keys. The server co-signs as fee payer only after
+  the transaction passes the sponsor policy (`packages/core/src/sponsor.ts`), and it rate-limits per
+  employee. The policy check is what makes co-signing safe. See its header for the one known gap:
+  proof-account rent.
 
 **What's stored off-chain**
 - MongoDB: companies, members, wallets, invites, payroll runs, per-payment status and signatures.
@@ -436,12 +441,15 @@ milestone while the current one is broken.
   withdraw, balance decryption, and auditor decryption of transfer amounts.
 - An integration test that reproduces the whole M0 flow in TypeScript against devnet or Surfpool.
 - **Done when** the TS test passes end to end, including the accountant decrypting the transfer amount.
-- **Status (Sep 27): ✅ done on Surfpool.** `pnpm test:integration` passes 8/8 in about 15s.
+- **Status (Sep 27): ✅ done on Surfpool.** `pnpm test:integration` passes 9/9 in about 15s.
   - It covers a manual-approval mint with the accountant as auditor, a fresh 0-SOL employee
     onboarded with sponsored fees, the treasury deposit, the payment (public balance stays 0),
     the employee decrypting, the accountant decrypting (single transaction and treasury
     history), and collect + withdraw with the employee still at 0 SOL.
-  - `pnpm test` runs 32 unit tests, for amounts and the auditor's lo/hi split.
+  - Every employee transaction in it goes through the sponsor policy, as in the app, and the
+    employee's payment history is decrypted from chain data.
+  - `pnpm test` runs 49 unit tests: amounts, the auditor's lo/hi split, and the sponsor policy
+    (the allowed employee flows and the attacks it must refuse).
   - Devnet run pending, as for M0.
 
 ### M2 — Employee portal
@@ -449,6 +457,10 @@ milestone while the current one is broken.
 - The invite → connect → sign → configured flow, with fees sponsored.
 - Balances decrypted in the browser; collect pay; withdraw; history.
 - **Done when** a fresh wallet with 0 SOL can join, receive a payment and withdraw it.
+- **Status (Sep 27): ✅ done on Surfpool, in the browser.** A fresh test-wallet identity with 0 SOL
+  accepted an invite, set up its private account (the server checked and co-signed the sponsored
+  transaction, then approved the account), received 4,200, saw it decrypted with the history,
+  collected it and withdrew 1,000, still at 0 SOL. Devnet run pending.
 
 ### M3 — Company dashboard and payroll engine
 
@@ -456,11 +468,24 @@ milestone while the current one is broken.
 - A payroll run as a resumable job with live per-employee progress.
 - **Done when** a 10-person run completes and every employee sees the correct decrypted amount,
   while a block explorer shows no amounts.
+- **Status (Sep 27): ✅ done on Surfpool.**
+  - A 10-person run was approved in the dashboard and completed with live progress (50,600 sUSD).
+  - All 10 employees decrypted the right amounts: 9 checked with their own keys by script, Priya
+    in the browser.
+  - The payment as the public sees it (RPC `getTransaction`): no amount anywhere, public balances 0.
+    The hosted explorer can't reach a local validator, so take the explorer screenshot on devnet.
+  - Crash recovery was checked too. A payment that landed before a crash is marked paid without
+    paying again, and its signature is recovered from the chain. One that never landed is retried
+    once. The treasury paid exactly the expected total.
 
 ### M4 — Accountant view
 
 - Load the auditor key locally → list transfers → decrypt → CSV export.
 - **Done when** the exported CSV matches the payroll run exactly.
+- **Status (Sep 27): ✅ done on Surfpool.** Without the key, the view lists every treasury payment
+  from the chain with amounts shown as encrypted. With the key file loaded, all 9 amounts of the
+  seeded run decrypted correctly (46,400 in total). The CSV's 9 signatures and amounts match the
+  run's confirmed payments exactly.
 
 ### M5 — Sealed Vault program (stretch)
 
@@ -474,6 +499,11 @@ milestone while the current one is broken.
 - Demo video, pitch video, README with setup instructions, architecture diagram.
 - Traction evidence (§13).
 - Submissions (§14).
+- **Status (Sep 27): in progress.** Done: the seeded demo company (`pnpm seed`, in
+  `apps/web/scripts/seed-demo.ts` rather than root `scripts/`, because it reuses the app's server
+  modules), the README, `docs/architecture.png`, `docs/pitch.md`, `docs/demo-script.md`,
+  `docs/traction.md`, `docs/submission.md`, and a passing production build. Left for the founder:
+  the videos, the deck, traction calls, deploying the devnet demo, and the submissions.
 
 ### Cut line if behind schedule
 
@@ -624,7 +654,8 @@ Sealed doesn't use Panta.
 - [ ] Performance of WASM proof generation in the browser and in Node, per transfer.
   - Node: a full confidential transfer, from proof generation to all transactions confirmed,
     takes about 3s on Surfpool; a withdraw about 2.5s.
-  - Browser: not measured yet (M2).
+  - Browser: account setup, collect and withdraw each finished within a few seconds on Surfpool
+    (not precisely timed yet).
 - [ ] Can v1 transactions carry a whole confidential transfer in one transaction with current tooling?
 - [ ] PYUSD on-chain confidential config: approve policy and auditor.
 - [x] Does the CLI's key derivation match `solana-conf-bal/v1`? (It affects whether CLI-configured accounts are usable in the app.)

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { createRemoteSponsorSigner, createSealedClient, deriveKeys, type ConfidentialKeys, type SealedClient } from '@sealed/core';
 
-import { PUBLIC_RPC_URL } from '../config';
+import { PUBLIC_RPC_SUBSCRIPTIONS_URL, PUBLIC_RPC_URL } from '../config';
 import { api, fromBase64, toBase64 } from './api';
 import { useMessageSigner } from './wallet';
 
@@ -58,7 +58,12 @@ export function createEmployeeClient(input: { memberId: string; vault: string })
   });
   // Inline proofs: no record accounts (which the sponsor refuses), and no room for the extra
   // compute-budget instruction that resource estimation would add.
-  return createSealedClient({ rpcUrl: PUBLIC_RPC_URL, feePayer: sponsor, estimateResourceLimits: false });
+  return createSealedClient({
+    rpcUrl: PUBLIC_RPC_URL,
+    rpcSubscriptionsUrl: PUBLIC_RPC_SUBSCRIPTIONS_URL,
+    feePayer: sponsor,
+    estimateResourceLimits: false,
+  });
 }
 
 let readOnly: Promise<SealedClient> | null = null;
@@ -67,6 +72,7 @@ let readOnly: Promise<SealedClient> | null = null;
 export function readOnlyClient(): Promise<SealedClient> {
   readOnly ??= createSealedClient({
     rpcUrl: PUBLIC_RPC_URL,
+    rpcSubscriptionsUrl: PUBLIC_RPC_SUBSCRIPTIONS_URL,
     feePayer: createNoopSigner('11111111111111111111111111111111' as Address),
   });
   return readOnly;

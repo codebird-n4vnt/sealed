@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { CLUSTER, PUBLIC_RPC_URL } from '../config';
+import { CLUSTER, PUBLIC_RPC_SUBSCRIPTIONS_URL, PUBLIC_RPC_URL } from '../config';
 
 function required(name: string): string {
   const value = process.env[name];
@@ -18,6 +18,7 @@ export const env = {
   },
   /** The server's RPC; defaults to the public one. */
   rpcUrl: process.env.RPC_URL ?? PUBLIC_RPC_URL,
+  rpcSubscriptionsUrl: process.env.RPC_SUBSCRIPTIONS_URL || PUBLIC_RPC_SUBSCRIPTIONS_URL,
   cluster: CLUSTER,
 };
 

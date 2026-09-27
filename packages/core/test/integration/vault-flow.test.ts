@@ -49,6 +49,7 @@ import {
 import { loadOrCreateKeypairSigner } from '../../src/node';
 
 const RPC_URL = resolveRpcUrl(process.env.RPC_URL ?? 'localnet');
+const RPC_SUBSCRIPTIONS_URL = process.env.RPC_SUBSCRIPTIONS_URL || undefined;
 const EMPLOYER_KEYPAIR = join(import.meta.dirname, '..', '..', '..', '..', '.keys', 'employer.json');
 const DECIMALS = 6;
 const USDC_IN = parseAmount('1000');
@@ -73,7 +74,7 @@ describe('Sealed Vault: USDC in, confidential payroll, USDC out', { timeout: 180
   beforeAll(async () => {
     employer = await loadOrCreateKeypairSigner(EMPLOYER_KEYPAIR);
     employee = await generateKeyPairSigner();
-    client = await createSealedClient({ rpcUrl: RPC_URL, feePayer: employer });
+    client = await createSealedClient({ rpcUrl: RPC_URL, rpcSubscriptionsUrl: RPC_SUBSCRIPTIONS_URL, feePayer: employer });
     deployed = (await client.rpc.getAccountInfo(SEALED_VAULT_PROGRAM_ADDRESS, { encoding: 'base64' }).send()).value?.executable ?? false;
     if (!deployed) return;
     if ((await client.rpc.getBalance(employer.address).send()).value < 500_000_000n) {
@@ -137,6 +138,7 @@ describe('Sealed Vault: USDC in, confidential payroll, USDC out', { timeout: 180
     employeeToken = await tokenAccountAddress(employee.address, companyMint);
     const employeeClient = await createSealedClient({
       rpcUrl: RPC_URL,
+      rpcSubscriptionsUrl: RPC_SUBSCRIPTIONS_URL,
       feePayer: createRemoteSponsorSigner(employer.address, wire =>
         sponsorTransaction(wire, employer, { owner: employee.address, token: employeeToken, mint: companyMint }),
       ),

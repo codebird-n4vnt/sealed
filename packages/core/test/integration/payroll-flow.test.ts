@@ -43,6 +43,7 @@ import {
 import { loadOrCreateKeypairSigner } from '../../src/node';
 
 const RPC_URL = resolveRpcUrl(process.env.RPC_URL ?? 'localnet');
+const RPC_SUBSCRIPTIONS_URL = process.env.RPC_SUBSCRIPTIONS_URL || undefined;
 const EMPLOYER_KEYPAIR = join(import.meta.dirname, '..', '..', '..', '..', '.keys', 'employer.json');
 const MIN_EMPLOYER_LAMPORTS = 200_000_000n;
 const DECIMALS = 6;
@@ -74,7 +75,7 @@ describe('confidential payroll, end to end', { timeout: 180_000 }, () => {
     // The employer is persistent so devnet SOL can be topped up once; everyone else is new each run.
     employer = await loadOrCreateKeypairSigner(EMPLOYER_KEYPAIR);
     [employee, accountant] = await Promise.all([generateKeyPairSigner(), generateKeyPairSigner()]);
-    client = await createSealedClient({ rpcUrl: RPC_URL, feePayer: employer });
+    client = await createSealedClient({ rpcUrl: RPC_URL, rpcSubscriptionsUrl: RPC_SUBSCRIPTIONS_URL, feePayer: employer });
 
     if ((await sol(employer.address)) < MIN_EMPLOYER_LAMPORTS) {
       await client.rpc.requestAirdrop(employer.address, lamports(1_000_000_000n)).send().catch(() => {});
@@ -123,6 +124,7 @@ describe('confidential payroll, end to end', { timeout: 180_000 }, () => {
     const policy = { owner: employee.address, token: salaryAccount, mint };
     employeeClient = await createSealedClient({
       rpcUrl: RPC_URL,
+      rpcSubscriptionsUrl: RPC_SUBSCRIPTIONS_URL,
       feePayer: createRemoteSponsorSigner(employer.address, wire => sponsorTransaction(wire, employer, policy)),
       estimateResourceLimits: false,
     });

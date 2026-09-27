@@ -175,6 +175,7 @@ async function main() {
     // Exactly the browser's path: the company sponsors fees, after the sponsor policy approves.
     const client = await createSealedClient({
       rpcUrl: env.rpcUrl,
+      rpcSubscriptionsUrl: env.rpcSubscriptionsUrl,
       feePayer: createRemoteSponsorSigner(vault.address, wire =>
         sponsorTransaction(wire, vault, { owner: employee.address, token, mint }),
       ),

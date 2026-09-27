@@ -60,7 +60,7 @@ export async function companyChain(company: CompanyDoc): Promise<CompanyChain> {
   const vault = await loadSigner(company.vault.seedEnc);
   let client = clientCache.get(vault.address);
   if (!client) {
-    client = createSealedClient({ rpcUrl: env.rpcUrl, feePayer: vault });
+    client = createSealedClient({ rpcUrl: env.rpcUrl, rpcSubscriptionsUrl: env.rpcSubscriptionsUrl, feePayer: vault });
     clientCache.set(vault.address, client);
   }
   let keys = keysCache.get(vault.address);

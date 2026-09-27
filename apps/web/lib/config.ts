@@ -7,6 +7,9 @@ export const CLUSTER: Cluster = process.env.NEXT_PUBLIC_SOLANA_CLUSTER === 'devn
 export const PUBLIC_RPC_URL =
   process.env.NEXT_PUBLIC_RPC_URL ?? (CLUSTER === 'devnet' ? 'https://api.devnet.solana.com' : 'http://127.0.0.1:8899');
 
+/** Websocket endpoint for confirmations; by default derived from the RPC URL. */
+export const PUBLIC_RPC_SUBSCRIPTIONS_URL = process.env.NEXT_PUBLIC_RPC_SUBSCRIPTIONS_URL || undefined;
+
 /** The Wallet Standard chain wallets must support to use Sealed. */
 export const WALLET_CHAIN = `solana:${CLUSTER}` as const;
 

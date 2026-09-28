@@ -36,7 +36,13 @@ moved into or out of confidential balances (funding the treasury, withdrawing).
 - **Payroll runs are resumable jobs.** The admin reviews a run and approves it with a wallet
   signature. The server then generates the transfer proofs and pays one employee at a time
   (each proof depends on the treasury balance before it). Before retrying an interrupted payment,
-  it checks the treasury balance, so nobody is paid twice.
+  it waits until that attempt can no longer land, then checks the treasury balance, so nobody is
+  paid twice.
+- **One transaction per payment.** With the v1 transaction format (4,096 bytes), a payment's three
+  proofs and the transfer fit in one transaction, and so does an employee's withdrawal
+  ([`packages/core/src/one-transaction.ts`](packages/core/src/one-transaction.ts)). No proof
+  accounts are created. A 10-person run on devnet takes about 30 seconds. On a local validator the
+  app uses the multi-transaction flow (`NEXT_PUBLIC_TRANSACTION_VERSION` switches it).
 - **Compliance is built in.** Each company token carries the accountant's auditor key, so every
   transfer also encrypts its amount for the accountant. The auditor key is generated in the admin's
   browser and saved as a file; the server never has it.
@@ -82,9 +88,14 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ### On devnet
 
 Set `NEXT_PUBLIC_SOLANA_CLUSTER=devnet`. A private devnet RPC (Helius, Triton, QuickNode) is the
-most reliable choice. With the public one: on Sep 27, 2026, `api.devnet.solana.com` failed account
-reads and deep history queries while everything else worked. For that case there's a local proxy
-that routes those calls to a second public RPC and paces requests:
+most reliable choice. The public `api.devnet.solana.com` works, with two caveats:
+
+- It allows only about one history read (`getTransaction`) per second. The accountant view reads
+  every treasury transaction, so its first load takes about a minute for a company with ~50
+  payments; the browser then caches them.
+- On Sep 27, 2026 it failed account reads and deep history queries all day (it recovered the next
+  morning). For that case there's a local proxy that routes those calls to a second public RPC and
+  paces requests:
 
 ```bash
 node scripts/devnet-rpc-proxy.mjs          # http://127.0.0.1:8898
@@ -149,6 +160,9 @@ pnpm vault:build                      # needs Anchor 1.1 and the Solana CLI
 pnpm vault:deploy -u localhost        # or -u devnet
 ```
 
+`test/integration/one-transaction-flow.test.ts` runs the payroll flow with v1 one-transaction
+payments and withdrawals. It needs a cluster that accepts v1 (`RPC_URL=devnet`).
+
 The day-1 CLI check is still there too: `bash scripts/day1-confidential-transfer.sh` (devnet by
 default, or `RPC_URL=http://127.0.0.1:8899` for Surfpool).
 
@@ -160,10 +174,10 @@ default, or `RPC_URL=http://127.0.0.1:8899` for Surfpool).
   service behind multisig approval.
 - **Salaries in the database are encrypted** with a key from the environment. Anyone who has both
   the database and that key can read them.
-- **Sponsored proof accounts:** the withdraw proof is too large to create and verify in one
-  legacy/v0 transaction. In between, someone could take over a company-funded proof account and
-  reclaim about 0.002 SOL of rent. Per-employee rate limits bound this, and single-transaction
-  proofs with the v1 transaction format close it.
+- **Sponsored proof accounts (v0 mode only):** in legacy/v0 transactions the withdraw proof is too
+  large to create and verify in one transaction. In between, someone could take over a
+  company-funded proof account and reclaim about 0.002 SOL of rent. Per-employee rate limits bound
+  this. In v1 mode (the default on devnet) withdrawals create no proof accounts, so the gap is gone.
 - **Withdrawals are public.** Withdrawing exactly your salary reveals it. The app says so.
 - **Kill switch.** The ZK proof program can be disabled network-wide, as happened in 2025. While
   it's off, confidential balances can't move (last time the ciphertexts survived). Sealed keeps only

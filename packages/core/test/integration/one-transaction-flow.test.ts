@@ -4,9 +4,11 @@
  *
  * Needs a cluster with the ZK ElGamal proof program that accepts v1 transactions:
  *   RPC_URL=devnet pnpm test:integration one-transaction
+ * On a cluster that rejects v1 (possibly a local validator), the tests are skipped.
  */
 import { join } from 'node:path';
 
+import { getTransferSolInstruction } from '@solana-program/system';
 import { fetchToken, TOKEN_2022_PROGRAM_ADDRESS } from '@solana-program/token-2022';
 import { generateKeyPairSigner, lamports, type Address, type KeyPairSigner } from '@solana/kit';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -56,6 +58,7 @@ describe('one-transaction payroll (v1 transactions)', { timeout: 180_000 }, () =
   let mint: Address;
   let treasury: Address;
   let salaryAccount: Address;
+  let v1Supported = true;
 
   const sol = async (address: Address) => (await client.rpc.getBalance(address).send()).value;
 
@@ -70,6 +73,15 @@ describe('one-transaction payroll (v1 transactions)', { timeout: 180_000 }, () =
     });
     if ((await sol(employer.address)) < 200_000_000n) {
       await client.rpc.requestAirdrop(employer.address, lamports(1_000_000_000n)).send().catch(() => {});
+    }
+    // A 1-lamport v1 transaction, to find out whether this cluster accepts the format at all.
+    try {
+      await client.sendTransaction(getTransferSolInstruction({ source: employer, destination: employer.address, amount: 1n }));
+    } catch (error) {
+      if (!/version|deserializ|invalid transaction/i.test(String(error))) throw error;
+      v1Supported = false;
+      console.warn(`Skipping: ${RPC_URL} does not accept v1 transactions (${String(error).split('\n')[0]}).`);
+      return;
     }
     [employerKeys, employeeKeys, accountantKeys] = await Promise.all([deriveKeys(employer), deriveKeys(employee), deriveKeys(accountant)]);
 
@@ -94,7 +106,8 @@ describe('one-transaction payroll (v1 transactions)', { timeout: 180_000 }, () =
     await depositToConfidential(client, { owner: employer, mint, keys: employerKeys, amount: FUND, decimals: DECIMALS });
   }, 120_000);
 
-  it('pays in one transaction: three inline proofs and the transfer, no proof accounts', async () => {
+  it('pays in one transaction: three inline proofs and the transfer, no proof accounts', async ({ skip }) => {
+    if (!v1Supported) skip();
     const { signature } = await payConfidential(client, {
       mint,
       from: { owner: employer, keys: employerKeys },
@@ -112,7 +125,8 @@ describe('one-transaction payroll (v1 transactions)', { timeout: 180_000 }, () =
     expect((await fetchToken(client.rpc, salaryAccount)).data.amount).toBe(0n);
   });
 
-  it('lets the employee and the accountant decrypt it from the chain', async () => {
+  it('lets the employee and the accountant decrypt it from the chain', async ({ skip }) => {
+    if (!v1Supported) skip();
     await applyPendingBalance(employeeClient, { owner: employee, mint, keys: employeeKeys });
     const [received] = await fetchReceivedPayments(employeeClient, { owner: employee.address, mint, keys: employeeKeys });
     expect(received?.amount).toBe(PAY);
@@ -120,7 +134,8 @@ describe('one-transaction payroll (v1 transactions)', { timeout: 180_000 }, () =
     expect(audited?.amount).toBe(PAY);
   });
 
-  it('withdraws in one sponsored transaction, with the employee still at 0 SOL', async () => {
+  it('withdraws in one sponsored transaction, with the employee still at 0 SOL', async ({ skip }) => {
+    if (!v1Supported) skip();
     const signature = await withdrawConfidential(employeeClient, {
       owner: employee,
       mint,

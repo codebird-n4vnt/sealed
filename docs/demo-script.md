@@ -1,24 +1,29 @@
 # Sealed: demo video script
 
 A 2–3 minute video that follows one story. It's recorded on devnet so the public explorer works.
-Check Colosseum's current length and format rules before recording.
+Colosseum asks for a 2–3 minute presentation video and a separate product demo of at most 3 minutes;
+this script is the product demo, and the pitch is in `docs/pitch.md`.
 
 ## Before recording
 
 1. Configure `apps/web/.env.local` for devnet (`NEXT_PUBLIC_SOLANA_CLUSTER=devnet`) and start the
-   app (`pnpm dev`, or a deployed URL).
-2. Seed the demo company: `pnpm seed`. If the devnet airdrop is rate-limited, send 1 devnet SOL to
-   the vault address it prints (faucet.solana.com); the script waits for it.
+   app (`pnpm dev`, or a deployed URL). A private devnet RPC makes every screen faster (see the
+   README's "On devnet").
+2. Seed the demo company: `pnpm seed --fund-from ../../.keys/employer.json` (a wallet with about
+   0.3 devnet SOL), or plain `pnpm seed` and send 1 devnet SOL to the vault address it prints if the
+   airdrop is rate-limited.
 3. In the browser (one profile per role makes switching cleaner):
-   - **Admin:** import `.keys/demo/test-wallet-identities.json` into the test wallet, or run the
-     seed with `--admin <your Phantom address>`.
+   - **Admin:** import `.keys/demo-devnet/test-wallet-identities.json` into the test wallet, or run
+     the seed with `--admin <your Phantom address>`.
    - **Priya:** a fresh wallet with 0 SOL: a new test wallet identity named "Priya", or a new
      Phantom account on devnet.
-   - **Accountant:** the seeded accountant identity, and `.keys/demo/auditor-key-acme-dao.json`.
+   - **Accountant:** the seeded accountant identity, and `.keys/demo-devnet/auditor-key-acme-dao.json`.
+     Open the accountant view once before recording. On the public devnet RPC its first load reads
+     every treasury transaction (about a minute); after that they're cached in the browser.
 4. Open a public USDC payroll example on Solscan for the opening shot (any transaction list of a
    known payroll or grants wallet, where every amount is readable).
-5. Do one dry run of the whole script. Payroll for 10 people takes about 30–60 seconds on devnet, so
-   plan to cut or speed up that part.
+5. Do one dry run of the whole script. Payroll for 10 people took 26 seconds on devnet (each payment
+   is one transaction), so the whole run can stay on screen.
 
 ## Shot list
 

@@ -370,7 +370,8 @@ auditor can be set), and it's documented as not yet deployed on mainnet.
   because the proofs need the employee's secret keys. The server co-signs as fee payer only after
   the transaction passes the sponsor policy (`packages/core/src/sponsor.ts`), and it rate-limits per
   employee. The policy check is what makes co-signing safe. See its header for the one known gap:
-  proof-account rent.
+  proof-account rent. It only exists in v0 mode: in v1 mode (the default on devnet since Sep 28)
+  employee withdrawals are one transaction with no proof accounts.
 
 **What's stored off-chain**
 - MongoDB: companies, members, wallets, invites, payroll runs, per-payment status and signatures.
@@ -437,6 +438,8 @@ milestone while the current one is broken.
     GO on devnet.
   - On Solscan (devnet), the payment shows as a Token-2022 ConfidentialTransfer with no amount.
   - The first run also fixed two script bugs: the fee payer and the balance check.
+  - Sep 28: the public devnet RPC recovered, so the proxy is optional. It still allows only about
+    one `getTransaction` per second per IP (see the README's "On devnet").
 
 ### M1 — Core library (`packages/core`)
 
@@ -487,6 +490,14 @@ milestone while the current one is broken.
     once. The treasury paid exactly the expected total.
   - Devnet: ✅ a 10-person run approved in the browser completed with all 10 payments confirmed.
     On Solscan (devnet), Priya's payment shows a ConfidentialTransfer and no amount.
+  - Sep 28, devnet, one-transaction mode (v1): a 10-person run completed in 26 s, every payment
+    one transaction on its first attempt. The multi-transaction run the day before took about
+    3.5 minutes.
+  - Retries are now safe against late landings. When a payment errors after signing, the engine
+    waits until that transaction's signature settles or its last valid block height passes, then
+    checks the treasury. Resuming a submitted payment after a crash waits out its lifetime the same
+    way. Transient errors (rate limits, websocket drops) are retried up to 3 times with backoff.
+    Before this, two of ten payments in a rate-limited run failed outright.
 
 ### M4 — Accountant view
 
@@ -498,6 +509,9 @@ milestone while the current one is broken.
   run's confirmed payments exactly.
   - Devnet: ✅ 19 payments (last month's 9 plus today's 10) decrypted to 97,000 sUSD in total.
     The CSV's 19 signatures match the engine's confirmed payments exactly, with real dates.
+  - Sep 28: 45 payments, 26 of them one-transaction, decrypted to 229,900 sUSD. The CSV's 45
+    signatures match the engine's exactly. On the public RPC the first load of 53 transactions
+    took 81 s; the browser caches finalized transactions, so reloads are instant.
 
 ### M5 — Sealed Vault program (stretch)
 
@@ -742,7 +756,14 @@ Sealed doesn't use Panta.
     instructions directly.
   - It would cut payroll to one transaction per employee. It would also close the sponsor
     policy's proof-account gap, because a one-transaction withdraw creates no proof accounts.
-  - Still to check on a cluster: that it lands, and at what compute cost.
+  - ✅ Verified on devnet (Sep 28), `test/integration/one-transaction-flow.test.ts` 3/3:
+    - a payment landed as one v1 transaction of 2,395 bytes and 238,484 CU;
+    - a sponsored withdraw landed as one v1 transaction of 1,725 bytes and 123,926 CU, with the
+      employee at 0 SOL;
+    - both the employee and the accountant decrypt it from chain history.
+  - Implemented in `packages/core/src/one-transaction.ts` (`proofDelivery: 'one-transaction'`,
+    `transactionVersion: 1`). The app uses it on devnet. Surfpool's v1 support is unverified, so
+    localnet stays on v0.
 - [x] PYUSD on-chain confidential config: approve policy and auditor.
   - Read on mainnet (Sep 27, 2026):
     - approve policy `manual` (Paxos approves every confidential account);

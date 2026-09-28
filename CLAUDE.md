@@ -716,12 +716,33 @@ Sealed doesn't use Panta.
   - Pass `transferAmountAuditorCiphertextLo` and `...Hi` through `ElGamalCiphertext.fromBytes`,
     then `ElGamalSecretKey.decrypt`.
   - amount = lo + (hi << 16). Implemented in `packages/core/src/auditor.ts`.
-- [ ] Performance of WASM proof generation in the browser and in Node, per transfer.
-  - Node: a full confidential transfer, from proof generation to all transactions confirmed,
-    takes about 3s on Surfpool; a withdraw about 2.5s.
-  - Browser: account setup, collect and withdraw each finished within a few seconds on Surfpool
-    (not precisely timed yet).
-- [ ] Can v1 transactions carry a whole confidential transfer in one transaction with current tooling?
+- [x] Performance of WASM proof generation in the browser and in Node, per transfer.
+  - Proof generation alone (`pnpm --filter @sealed/core bench:proofs`, Ryzen 5 5500U, Sep 28):
+    - Node: a transfer's three proofs take 77 ms (median of 10); a withdraw's two take 38 ms.
+    - Chrome 152 (the same `@solana/zk-sdk` 0.5.3 web build): 81 ms and 39 ms.
+  - End to end on Surfpool, a transfer took about 3s and a withdraw about 2.5s. So network
+    round trips dominate, not proofs.
+  - A 100-person run is about 8s of proving, so a large run's time is set by transaction count
+    and confirmation, not proof generation.
+- [x] Can v1 transactions carry a whole confidential transfer in one transaction with current tooling?
+  - Yes, going by size and compute. Measured offline from real encoded transactions (not sent to a
+    cluster yet).
+  - A transfer is three inline verify instructions plus the transfer, which reads them through
+    the instructions sysvar (offsets -3, -2, -1). It compiles to **2,391 bytes** as a v1
+    transaction. A withdraw is **1,721 bytes** with both signatures. The v1 limit is 4,096.
+    - Proof data is 320 (equality) + 544 (batched 3-handle validity) + 1,000 (batched U128
+      range) bytes for a transfer, and 320 + 936 (batched U64 range) for a withdraw.
+  - Compute (Agave's zk-elgamal-proof constants): 6,400 + 16,400 + 200,000 = 222,800 CU of
+    verification per transfer, far below the 1.4M per-transaction cap.
+  - In v1, the compute-unit limit is a message config field, not an instruction, so it costs no
+    instruction bytes. That removes the reason the library's inline plans couldn't take one.
+  - Tooling: `@solana/kit` 8.3 compiles v1 messages. Token-2022's generated instruction builders
+    take the offsets and the instructions sysvar. The high-level plan helpers still build the
+    multi-transaction context-account flow, so a one-transaction path means composing the
+    instructions directly.
+  - It would cut payroll to one transaction per employee. It would also close the sponsor
+    policy's proof-account gap, because a one-transaction withdraw creates no proof accounts.
+  - Still to check on a cluster: that it lands, and at what compute cost.
 - [x] PYUSD on-chain confidential config: approve policy and auditor.
   - Read on mainnet (Sep 27, 2026):
     - approve policy `manual` (Paxos approves every confidential account);

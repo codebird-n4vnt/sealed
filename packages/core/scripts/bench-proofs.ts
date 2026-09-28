@@ -139,9 +139,13 @@ async function sizeAsOneV1Transaction(label: string, feePayer: TransactionSigner
 time('transfer proofs', transferProofs);
 time('withdraw proofs', withdrawProofs);
 
-const [company, employee, source, destination, mint] = await Promise.all(
-  Array.from({ length: 5 }, () => generateKeyPairSigner()),
-);
+const [company, employee, source, destination, mint] = await Promise.all([
+  generateKeyPairSigner(),
+  generateKeyPairSigner(),
+  generateKeyPairSigner(),
+  generateKeyPairSigner(),
+  generateKeyPairSigner(),
+]);
 
 // Payroll: the company's vault pays and signs as the treasury owner.
 const t = transferProofs();

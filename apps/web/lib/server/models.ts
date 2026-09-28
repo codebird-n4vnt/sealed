@@ -92,6 +92,8 @@ const paymentSchema = new Schema(
     },
     /** The treasury's available balance before the attempt; lets a retry tell if it landed. */
     treasuryBeforeEnc: String,
+    /** When the latest attempt was handed to the network; a retry waits until it can't land. */
+    submittedAt: Date,
     attempts: { type: Number, default: 0 },
     signature: String,
     error: String,

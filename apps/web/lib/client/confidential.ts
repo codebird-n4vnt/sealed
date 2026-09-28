@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { createRemoteSponsorSigner, createSealedClient, deriveKeys, type ConfidentialKeys, type SealedClient } from '@sealed/core';
 
-import { PUBLIC_RPC_SUBSCRIPTIONS_URL, PUBLIC_RPC_URL } from '../config';
+import { PUBLIC_RPC_SUBSCRIPTIONS_URL, PUBLIC_RPC_URL, TRANSACTION_VERSION } from '../config';
 import { api, fromBase64, toBase64 } from './api';
 import { useMessageSigner } from './wallet';
 
@@ -56,13 +56,15 @@ export function createEmployeeClient(input: { memberId: string; vault: string })
     });
     return fromBase64(signature) as SignatureBytes;
   });
-  // Inline proofs: no record accounts (which the sponsor refuses), and no room for the extra
-  // compute-budget instruction that resource estimation would add.
+  // Inline proofs: no record accounts (which the sponsor refuses). In v0 there's no room for the
+  // compute-budget instruction that resource estimation would add; in v1 the limit is a message
+  // field, so it's estimated as usual.
   return createSealedClient({
     rpcUrl: PUBLIC_RPC_URL,
     rpcSubscriptionsUrl: PUBLIC_RPC_SUBSCRIPTIONS_URL,
     feePayer: sponsor,
-    estimateResourceLimits: false,
+    transactionVersion: TRANSACTION_VERSION,
+    estimateResourceLimits: TRANSACTION_VERSION === 1,
   });
 }
 

@@ -11,6 +11,7 @@ import { AddressLink, Amount, Button, Card, EmptyState, ErrorText, Notice, PageH
 import { api, errorMessage } from '@/lib/client/api';
 import { parseAuditorKey } from '@/lib/client/auditor-key';
 import { readOnlyClient } from '@/lib/client/confidential';
+import { transactionCache } from '@/lib/client/transaction-cache';
 
 type AuditCompany = {
   id: string;
@@ -51,14 +52,29 @@ function CompanyAudit({ company }: { company: AuditCompany }) {
   const [secret, setSecret] = useState<ElGamalSecretKey | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [keyError, setKeyError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 
   useEffect(() => {
+    const controller = new AbortController();
     setTransfers(null);
     setSecret(null);
+    setError(null);
+    setProgress(null);
     readOnlyClient()
-      .then(client => fetchConfidentialTransfers(client, { tokenAccount: company.treasuryAccount as Address, limit: 500 }))
+      .then(client =>
+        fetchConfidentialTransfers(client, {
+          tokenAccount: company.treasuryAccount as Address,
+          limit: 500,
+          cache: transactionCache,
+          signal: controller.signal,
+          onProgress: (done, total) => setProgress({ done, total }),
+        }),
+      )
       .then(all => setTransfers(all.filter(t => t.sourceToken === company.treasuryAccount)))
-      .catch(e => setError(errorMessage(e)));
+      .catch(e => {
+        if (!controller.signal.aborted) setError(errorMessage(e));
+      });
+    return () => controller.abort();
   }, [company.treasuryAccount]);
 
   const rows: Row[] = useMemo(() => {
@@ -137,7 +153,12 @@ function CompanyAudit({ company }: { company: AuditCompany }) {
         }
       >
         <ErrorText error={error} />
-        {!transfers && !error && <Spinner />}
+        {!transfers && !error && (
+          <p className="flex items-center gap-2 text-sm text-muted">
+            <Spinner />
+            {progress ? `Reading transactions from the chain: ${progress.done} of ${progress.total}` : 'Reading the treasury history'}
+          </p>
+        )}
         {transfers && rows.length === 0 && <EmptyState title="No payments yet" />}
         {rows.length > 0 && (
           <div className="-mx-2 overflow-x-auto">

@@ -10,6 +10,17 @@ export const PUBLIC_RPC_URL =
 /** Websocket endpoint for confirmations; by default derived from the RPC URL. */
 export const PUBLIC_RPC_SUBSCRIPTIONS_URL = process.env.NEXT_PUBLIC_RPC_SUBSCRIPTIONS_URL || undefined;
 
+/**
+ * Transaction format. With v1 (4,096-byte transactions), each payment and each withdrawal is one
+ * transaction with its proofs inline, and no proof accounts. Default: v1 on devnet (verified
+ * there), v0 on a local validator (Surfpool's v1 support isn't verified). Override with
+ * NEXT_PUBLIC_TRANSACTION_VERSION=0 or 1.
+ */
+export const TRANSACTION_VERSION: 0 | 1 =
+  process.env.NEXT_PUBLIC_TRANSACTION_VERSION === '1' ? 1
+  : process.env.NEXT_PUBLIC_TRANSACTION_VERSION === '0' ? 0
+  : CLUSTER === 'devnet' ? 1 : 0;
+
 /** The Wallet Standard chain wallets must support to use Sealed. */
 export const WALLET_CHAIN = `solana:${CLUSTER}` as const;
 

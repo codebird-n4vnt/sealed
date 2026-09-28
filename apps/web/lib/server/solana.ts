@@ -23,6 +23,7 @@ import {
   type SealedClient,
 } from '@sealed/core';
 
+import { TRANSACTION_VERSION } from '../config';
 import { env } from './env';
 import type { CompanyDoc } from './models';
 import { decryptBytes, encryptBytes } from './secrets';
@@ -60,7 +61,12 @@ export async function companyChain(company: CompanyDoc): Promise<CompanyChain> {
   const vault = await loadSigner(company.vault.seedEnc);
   let client = clientCache.get(vault.address);
   if (!client) {
-    client = createSealedClient({ rpcUrl: env.rpcUrl, rpcSubscriptionsUrl: env.rpcSubscriptionsUrl, feePayer: vault });
+    client = createSealedClient({
+      rpcUrl: env.rpcUrl,
+      rpcSubscriptionsUrl: env.rpcSubscriptionsUrl,
+      feePayer: vault,
+      transactionVersion: TRANSACTION_VERSION,
+    });
     clientCache.set(vault.address, client);
   }
   let keys = keysCache.get(vault.address);

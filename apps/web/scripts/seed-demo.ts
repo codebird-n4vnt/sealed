@@ -41,6 +41,7 @@ import {
 } from '@sealed/core';
 import { loadKeypairSigner } from '@sealed/core/node';
 
+import { TRANSACTION_VERSION } from '../lib/config';
 import { connectDb } from '../lib/server/db';
 import { env } from '../lib/server/env';
 import { Company, Member, PayrollRun } from '../lib/server/models';
@@ -199,7 +200,8 @@ async function main() {
       feePayer: createRemoteSponsorSigner(vault.address, wire =>
         sponsorTransaction(wire, vault, { owner: employee.address, token, mint }),
       ),
-      estimateResourceLimits: false,
+      transactionVersion: TRANSACTION_VERSION,
+      estimateResourceLimits: TRANSACTION_VERSION === 1,
     });
     await setupConfidentialAccount(client, { owner: employee, mint, keys });
     await approveMemberAccount(company, employee.address);

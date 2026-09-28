@@ -10,7 +10,8 @@
   },
   "scripts": {
     "test": "vitest run test/unit",
-    "test:integration": "vitest run test/integration"
+    "test:integration": "vitest run test/integration",
+    "bench:proofs": "tsx scripts/bench-proofs.ts"
   },
   "dependencies": {
     "@solana-program/system": "0.15.0",

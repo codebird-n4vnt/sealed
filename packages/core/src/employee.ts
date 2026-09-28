@@ -11,9 +11,9 @@ import { GroupedElGamalCiphertext3Handles, type ElGamalSecretKey } from '@solana
 import { signatureOfConfidentialInstruction, tokenAccountAddress } from './accounts';
 import { TRANSFER_AMOUNT_LO_BIT_LENGTH } from './auditor';
 import type { SealedClient } from './client';
-import { fetchConfidentialTransfers, fetchDecodedTransaction, withReadRetry } from './history';
+import { fetchConfidentialTransfers, fetchDecodedTransaction, withReadRetry, type HistoryReadOptions } from './history';
 import type { ConfidentialKeys } from './keys';
-import { oneTransactionWithdraw, ZK_VERIFY_BATCHED_GROUPED_CIPHERTEXT_3_HANDLES_VALIDITY } from './one-transaction';
+import { oneTransactionWithdraw, planningRpc, ZK_VERIFY_BATCHED_GROUPED_CIPHERTEXT_3_HANDLES_VALIDITY } from './one-transaction';
 import { ZK_ELGAMAL_PROOF_PROGRAM_ADDRESS } from './sponsor';
 
 /**
@@ -69,7 +69,8 @@ export async function withdrawConfidential(
     aesKey: input.keys.ae,
   };
   if (input.proofDelivery === 'one-transaction') {
-    const instructions = oneTransactionWithdraw(await getConfidentialWithdrawInstructionPlan(planInput));
+    const plan = await getConfidentialWithdrawInstructionPlan({ ...planInput, rpc: planningRpc(client.rpc) });
+    const instructions = oneTransactionWithdraw(plan);
     return (await client.sendTransaction(instructions)).context.signature;
   }
   const plan =
@@ -134,10 +135,10 @@ export async function decryptReceivedAmount(
 /** Payments the owner received, newest first, with amounts decrypted locally. */
 export async function fetchReceivedPayments(
   client: SealedClient,
-  input: { owner: Address; mint: Address; keys: ConfidentialKeys; limit?: number },
+  input: { owner: Address; mint: Address; keys: ConfidentialKeys; limit?: number } & HistoryReadOptions,
 ): Promise<ReceivedPayment[]> {
   const token = await tokenAccountAddress(input.owner, input.mint);
-  const transfers = await fetchConfidentialTransfers(client, { tokenAccount: token, limit: input.limit ?? 50 });
+  const transfers = await fetchConfidentialTransfers(client, { ...input, tokenAccount: token, limit: input.limit ?? 50 });
   const elgamalSecret = input.keys.elgamal.secret();
   const payments: ReceivedPayment[] = [];
   for (const transfer of transfers) {

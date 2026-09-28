@@ -47,6 +47,20 @@ const SYSTEM_CREATE_ACCOUNT = 0;
 
 type Parts = { verifies: Map<number, ReadonlyUint8Array>; main?: Instruction };
 
+/**
+ * An RPC for building a plan that will be repacked. Rent lookups are answered locally (with 0),
+ * because the proof context accounts they're for are dropped; everything else goes to `rpc`.
+ * Saves a round trip per proof.
+ */
+export function planningRpc<TRpc extends object>(rpc: TRpc): TRpc {
+  return new Proxy(rpc, {
+    get: (target, property) =>
+      property === 'getMinimumBalanceForRentExemption'
+        ? () => ({ send: async () => 0n })
+        : Reflect.get(target, property),
+  });
+}
+
 /** Sorts a plan's instructions into proof data and the one Token-2022 instruction. */
 function takeApart(plan: InstructionPlan, mainKind: number, verifyKinds: number[]): Parts {
   const parts: Parts = { verifies: new Map() };

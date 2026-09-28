@@ -12,15 +12,16 @@ import { ZK_ELGAMAL_PROOF_PROGRAM_ADDRESS } from './sponsor';
 
 /**
  * Retries a chain read. Public RPCs (devnet especially) intermittently fail history queries,
- * e.g. "Failed to query long-term storage", and reads are safe to repeat.
+ * e.g. "Failed to query long-term storage", and rate-limit bursts in 10-second windows, so the
+ * backoff (1, 2, 4, 8, 8 seconds) outlasts a window. Reads are safe to repeat.
  */
-export async function withReadRetry<T>(read: () => Promise<T>, attempts = 4): Promise<T> {
+export async function withReadRetry<T>(read: () => Promise<T>, attempts = 6): Promise<T> {
   for (let attempt = 1; ; attempt++) {
     try {
       return await read();
     } catch (error) {
       if (attempt >= attempts) throw error;
-      await new Promise(resolve => setTimeout(resolve, 750 * 2 ** (attempt - 1)));
+      await new Promise(resolve => setTimeout(resolve, Math.min(1_000 * 2 ** (attempt - 1), 8_000)));
     }
   }
 }
@@ -32,6 +33,23 @@ export type DecodedTransaction = {
   slot: bigint;
   blockTime: bigint | null;
   instructions: DecodedInstruction[];
+};
+
+/**
+ * Somewhere to keep decoded transactions between reads (e.g. the browser's storage). Transactions
+ * never change, and public RPCs strictly rate-limit history reads, so a cache saves most of them.
+ * Only finalized transactions are stored, so a transaction dropped with a fork can't linger.
+ */
+export type TransactionCache = {
+  get(signature: Signature): DecodedTransaction | undefined;
+  set(signature: Signature, transaction: DecodedTransaction): void;
+};
+
+export type HistoryReadOptions = {
+  cache?: TransactionCache;
+  /** Called after each transaction is read: how many are done, out of how many. */
+  onProgress?: (done: number, total: number) => void;
+  signal?: AbortSignal;
 };
 
 /** Fetches a confirmed transaction with its top-level instructions resolved to addresses. */
@@ -122,15 +140,22 @@ export function confidentialTransfersIn(transaction: DecodedTransaction): Confid
 /** Every confidential transfer into or out of `tokenAccount`, newest first. */
 export async function fetchConfidentialTransfers(
   client: SealedClient,
-  input: { tokenAccount: Address; limit?: number },
+  input: { tokenAccount: Address; limit?: number } & HistoryReadOptions,
 ): Promise<ConfidentialTransferRecord[]> {
   const signatures = await withReadRetry(() =>
     client.rpc.getSignaturesForAddress(input.tokenAccount, { limit: input.limit ?? 100, commitment: 'confirmed' }).send(),
   );
+  const landed = signatures.filter(({ err }) => !err);
   const transfers: ConfidentialTransferRecord[] = [];
-  for (const { signature, err } of signatures) {
-    if (err) continue;
-    transfers.push(...confidentialTransfersIn(await fetchDecodedTransaction(client, signature)));
+  for (const [index, { signature, confirmationStatus }] of landed.entries()) {
+    input.signal?.throwIfAborted();
+    let transaction = input.cache?.get(signature);
+    if (!transaction) {
+      transaction = await fetchDecodedTransaction(client, signature);
+      if (confirmationStatus === 'finalized') input.cache?.set(signature, transaction);
+    }
+    transfers.push(...confidentialTransfersIn(transaction));
+    input.onProgress?.(index + 1, landed.length);
   }
   return transfers;
 }

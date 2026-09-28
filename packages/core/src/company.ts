@@ -1,5 +1,7 @@
 import {
   CONFIDENTIAL_TRANSFER_CONFIDENTIAL_TRANSFER_DISCRIMINATOR,
+  decodeMint,
+  decodeToken,
   extension,
   fetchToken,
   getApproveConfidentialTransferAccountInstruction,
@@ -10,7 +12,16 @@ import {
   getConfidentialTransferInstructionPlan,
   getConfidentialTransferWithRecordInstructionPlan,
 } from '@solana-program/token-2022/confidential';
-import { none, some, type Address, type Signature, type TransactionSigner } from '@solana/kit';
+import {
+  assertAccountExists,
+  fetchEncodedAccounts,
+  none,
+  some,
+  type Address,
+  type EncodedAccount,
+  type Signature,
+  type TransactionSigner,
+} from '@solana/kit';
 
 import {
   applyPendingBalance,
@@ -21,7 +32,8 @@ import {
 import { DEFAULT_DECIMALS } from './amounts';
 import type { SealedClient } from './client';
 import type { ConfidentialKeys } from './keys';
-import { oneTransactionTransfer } from './one-transaction';
+import { withReadRetry } from './history';
+import { oneTransactionTransfer, planningRpc } from './one-transaction';
 
 /**
  * `manual`: the company must approve each account before it can use confidential transfers,
@@ -158,11 +170,37 @@ export async function payConfidential(
 ): Promise<Payment> {
   const sourceToken = await tokenAccountAddress(input.from.owner.address, input.mint);
   const destinationToken = await tokenAccountAddress(input.to, input.mint);
+
+  if (input.proofDelivery === 'one-transaction') {
+    // One read for both token accounts and the mint (for its auditor key), retried if the RPC is busy.
+    const [source, destination, mint] = await withReadRetry(() =>
+      fetchEncodedAccounts(client.rpc, [sourceToken, destinationToken, input.mint]),
+    );
+    for (const account of [source, destination, mint]) assertAccountExists(account!);
+    const plan = await getConfidentialTransferInstructionPlan({
+      payer: client.payer,
+      rpc: planningRpc(client.rpc),
+      mint: input.mint,
+      mintAccount: decodeMint(mint as EncodedAccount).data,
+      sourceToken,
+      sourceTokenAccount: decodeToken(source as EncodedAccount).data,
+      destinationToken,
+      destinationTokenAccount: decodeToken(destination as EncodedAccount).data,
+      authority: input.from.owner,
+      amount: input.amount,
+      sourceElgamalKeypair: input.from.keys.elgamal,
+      aesKey: input.from.keys.ae,
+    });
+    const instructions = oneTransactionTransfer(plan);
+    await input.onProofsReady?.();
+    const result = await client.sendTransaction(instructions);
+    return { signature: result.context.signature, sourceToken, destinationToken };
+  }
+
   const [{ data: sourceTokenAccount }, { data: destinationTokenAccount }] = await Promise.all([
     fetchToken(client.rpc, sourceToken),
     fetchToken(client.rpc, destinationToken),
   ]);
-
   const planInput = {
     payer: client.payer,
     rpc: client.rpc,
@@ -176,13 +214,6 @@ export async function payConfidential(
     sourceElgamalKeypair: input.from.keys.elgamal,
     aesKey: input.from.keys.ae,
   };
-
-  if (input.proofDelivery === 'one-transaction') {
-    const instructions = oneTransactionTransfer(await getConfidentialTransferInstructionPlan(planInput));
-    await input.onProofsReady?.();
-    const result = await client.sendTransaction(instructions);
-    return { signature: result.context.signature, sourceToken, destinationToken };
-  }
 
   // The record-staged range proof leaves room in each transaction for the compute-unit
   // limit the executor sets, so this works with the client's default settings on any RPC.

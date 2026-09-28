@@ -8,6 +8,7 @@ import {
   fetchConfidentialTransfers,
   fetchDecodedTransaction,
   type ConfidentialTransferRecord,
+  type HistoryReadOptions,
 } from './history';
 
 // Transfer amounts are encrypted in two halves: the low 16 bits and the high 32 bits.
@@ -57,7 +58,7 @@ export async function auditTransaction(
  */
 export async function fetchAuditedTransfers(
   client: SealedClient,
-  input: { tokenAccount: Address; auditorSecret: ElGamalSecretKey; limit?: number },
+  input: { tokenAccount: Address; auditorSecret: ElGamalSecretKey; limit?: number } & HistoryReadOptions,
 ): Promise<AuditedTransfer[]> {
   const transfers = await fetchConfidentialTransfers(client, input);
   return transfers.map(transfer => audit(transfer, input.auditorSecret));

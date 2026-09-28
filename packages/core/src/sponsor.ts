@@ -7,7 +7,8 @@
  * checks that the transaction can only spend the company's SOL on fees and on rent for accounts
  * that either belong to the employee's own token account or come back to the company:
  *
- * - Fee payer must be the sponsor. No address lookup tables.
+ * - Fee payer must be the sponsor. No address lookup tables. Legacy, v0 and v1 transactions; a
+ *   v1 transaction's priority fee (a total in lamports, set in the message) is capped.
  * - Only these programs: Compute Budget, System, Associated Token, Token-2022, ZK ElGamal Proof.
  * - System: only CreateAccount funded by the sponsor, for ZK proof context accounts, at no more
  *   than rent-exempt lamports, at most two per transaction.
@@ -18,11 +19,12 @@
  *   sponsor can close the account and reclaim its rent) and CloseContextState with the rent
  *   returned to the sponsor.
  *
- * Known gap: large proofs (the withdraw range proof) don't fit in one legacy/v0 transaction
- * with their CreateAccount, so an account can be created in one transaction and verified in
- * the next. In between, someone could verify into it with their own authority and later reclaim
- * its rent (about 0.002 SOL). The server rate-limits sponsored proof accounts per employee to
- * bound this; single-transaction proofs with the v1 transaction format close it.
+ * Known gap, in legacy/v0 transactions only: large proofs (the withdraw range proof) don't fit
+ * in one transaction with their CreateAccount, so an account can be created in one transaction
+ * and verified in the next. In between, someone could verify into it with their own authority and
+ * later reclaim its rent (about 0.002 SOL). The server rate-limits sponsored proof accounts per
+ * employee to bound this. One-transaction withdrawals in the v1 format (`one-transaction.ts`)
+ * create no proof accounts at all, so they don't have the gap.
  */
 import {
   getAddressDecoder,
@@ -84,8 +86,10 @@ export type SponsorPolicy = {
   /** The employee's token account for the company mint. */
   token: Address;
   mint: Address;
-  /** Highest priority fee the sponsor will pay, in micro-lamports per compute unit. */
+  /** Highest priority fee the sponsor will pay, in micro-lamports per compute unit (legacy/v0). */
   maxComputeUnitPrice?: bigint;
+  /** Highest total priority fee the sponsor will pay in a v1 transaction, in lamports. */
+  maxPriorityFeeLamports?: bigint;
 };
 
 export class SponsorPolicyError extends Error {
@@ -111,12 +115,27 @@ export function checkSponsoredTransaction(
   const transaction = getTransactionDecoder().decode(wireTransaction);
   const message = getCompiledTransactionMessageDecoder().decode(transaction.messageBytes);
 
-  if (message.version !== 'legacy' && message.version !== 0) {
-    throw new SponsorPolicyError(`unsupported transaction version ${message.version}`);
+  if (message.version !== 'legacy' && message.version !== 0 && message.version !== 1) {
+    throw new SponsorPolicyError(`unsupported transaction version ${String((message as { version: unknown }).version)}`);
   }
   if ('addressTableLookups' in message && (message.addressTableLookups?.length ?? 0) > 0) {
     reject('address lookup tables are not allowed');
   }
+  if (message.version === 1) {
+    // Config values follow the mask's order; the priority fee (both low bits set) comes first.
+    const priorityFee = (message.configMask & 0b11) === 0b11 ? message.configValues[0] : undefined;
+    const maxFee = policy.maxPriorityFeeLamports ?? 100_000n;
+    if (priorityFee && BigInt(priorityFee.value) > maxFee) reject(`priority fee above ${maxFee} lamports`);
+  }
+  // v1 messages split each instruction into a header and a payload.
+  const instructions =
+    message.version === 1
+      ? message.instructionHeaders.map((header, index) => ({
+          programAddressIndex: header.programAccountIndex,
+          accountIndices: message.instructionPayloads[index]?.instructionAccountIndices,
+          data: message.instructionPayloads[index]?.instructionData,
+        }))
+      : message.instructions;
 
   const accounts = message.staticAccounts;
   if (accounts[0] !== policy.sponsor) reject('the fee payer must be the company');
@@ -124,7 +143,7 @@ export function checkSponsoredTransaction(
   const maxPrice = policy.maxComputeUnitPrice ?? 1_000_000n;
   let createdContextAccounts = 0;
 
-  for (const [position, instruction] of message.instructions.entries()) {
+  for (const [position, instruction] of instructions.entries()) {
     const at = `instruction ${position}`;
     const program = accounts[instruction.programAddressIndex];
     const data = instruction.data ?? new Uint8Array();

@@ -33,9 +33,15 @@ export type SealedClientConfig = {
   feePayer: TransactionSigner;
   /**
    * Simulate each transaction to set its compute-unit limit (default true). Turn off to send
-   * inline-proof transactions, which leave no room for the extra compute-budget instruction.
+   * inline-proof legacy/v0 transactions, which leave no room for the compute-budget instruction.
+   * In v1 transactions the limit is a message field, so it never costs instruction space.
    */
   estimateResourceLimits?: boolean;
+  /**
+   * Transaction format (default 0). Version 1 allows 4,096-byte transactions, which one-transaction
+   * transfers and withdrawals (`proofDelivery: 'one-transaction'`) need. The cluster must support it.
+   */
+  transactionVersion?: 0 | 1;
 };
 
 /**
@@ -51,7 +57,10 @@ export async function createSealedClient(config: SealedClientConfig) {
       solanaRpc({
         rpcUrl,
         ...(rpcSubscriptionsUrl ? { rpcSubscriptionsUrl } : {}),
-        transactionConfig: { estimateResourceLimits: config.estimateResourceLimits ?? true },
+        transactionConfig: {
+          estimateResourceLimits: config.estimateResourceLimits ?? true,
+          version: config.transactionVersion ?? 0,
+        },
       }),
     )
     .use(token2022Program());

@@ -6,7 +6,10 @@ import {
   getConfidentialDepositInstruction,
   getMintToInstruction,
 } from '@solana-program/token-2022';
-import { getConfidentialTransferWithRecordInstructionPlan } from '@solana-program/token-2022/confidential';
+import {
+  getConfidentialTransferInstructionPlan,
+  getConfidentialTransferWithRecordInstructionPlan,
+} from '@solana-program/token-2022/confidential';
 import { none, some, type Address, type Signature, type TransactionSigner } from '@solana/kit';
 
 import {
@@ -18,6 +21,7 @@ import {
 import { DEFAULT_DECIMALS } from './amounts';
 import type { SealedClient } from './client';
 import type { ConfidentialKeys } from './keys';
+import { oneTransactionTransfer } from './one-transaction';
 
 /**
  * `manual`: the company must approve each account before it can use confidential transfers,
@@ -143,6 +147,13 @@ export async function payConfidential(
     amount: bigint;
     /** Called once the proofs are generated, just before the first transaction is sent. */
     onProofsReady?: () => void | Promise<void>;
+    /**
+     * `record` (default) stages the range proof in a record account, so it works in legacy/v0
+     * transactions with default client settings. `one-transaction` sends the proofs and the
+     * transfer as one v1 transaction, with no proof accounts; it needs a `transactionVersion: 1`
+     * client and a cluster that supports v1.
+     */
+    proofDelivery?: 'record' | 'one-transaction';
   },
 ): Promise<Payment> {
   const sourceToken = await tokenAccountAddress(input.from.owner.address, input.mint);
@@ -152,9 +163,7 @@ export async function payConfidential(
     fetchToken(client.rpc, destinationToken),
   ]);
 
-  // The record-staged range proof leaves room in each transaction for the compute-unit
-  // limit the executor sets, so this works with the client's default settings on any RPC.
-  const plan = await getConfidentialTransferWithRecordInstructionPlan({
+  const planInput = {
     payer: client.payer,
     rpc: client.rpc,
     mint: input.mint,
@@ -166,7 +175,18 @@ export async function payConfidential(
     amount: input.amount,
     sourceElgamalKeypair: input.from.keys.elgamal,
     aesKey: input.from.keys.ae,
-  });
+  };
+
+  if (input.proofDelivery === 'one-transaction') {
+    const instructions = oneTransactionTransfer(await getConfidentialTransferInstructionPlan(planInput));
+    await input.onProofsReady?.();
+    const result = await client.sendTransaction(instructions);
+    return { signature: result.context.signature, sourceToken, destinationToken };
+  }
+
+  // The record-staged range proof leaves room in each transaction for the compute-unit
+  // limit the executor sets, so this works with the client's default settings on any RPC.
+  const plan = await getConfidentialTransferWithRecordInstructionPlan(planInput);
   await input.onProofsReady?.();
   const result = await client.sendTransactions(plan);
   return {

@@ -1,11 +1,14 @@
 import {
   CONFIDENTIAL_TRANSFER_CONFIDENTIAL_TRANSFER_DISCRIMINATOR,
+  getConfidentialTransferInstructionDataDecoder,
   TOKEN_2022_PROGRAM_ADDRESS,
 } from '@solana-program/token-2022';
 import { getBase58Encoder, type Address, type Signature } from '@solana/kit';
 
 import { isConfidentialInstructionData } from './accounts';
 import type { SealedClient } from './client';
+import { ZK_VERIFY_BATCHED_GROUPED_CIPHERTEXT_3_HANDLES_VALIDITY } from './one-transaction';
+import { ZK_ELGAMAL_PROOF_PROGRAM_ADDRESS } from './sponsor';
 
 /**
  * Retries a chain read. Public RPCs (devnet especially) intermittently fail history queries,
@@ -36,7 +39,7 @@ export async function fetchDecodedTransaction(client: SealedClient, signature: S
   // A just-confirmed transaction can take a moment to be served, so "not found" is retried too.
   const transaction = await withReadRetry(async () => {
     const result = await client.rpc
-      .getTransaction(signature, { encoding: 'json', maxSupportedTransactionVersion: 0, commitment: 'confirmed' })
+      .getTransaction(signature, { encoding: 'json', maxSupportedTransactionVersion: 1, commitment: 'confirmed' })
       .send();
     if (!result) throw new Error(`Transaction ${signature} not found.`);
     return result;
@@ -74,20 +77,33 @@ export type ConfidentialTransferRecord = {
   data: Uint8Array;
   /**
    * The ciphertext-validity proof context account, when proofs were verified into context
-   * accounts (as Sealed does). Its proof holds the amount encrypted to the recipient.
+   * accounts. Its proof holds the amount encrypted to the recipient.
    */
   ciphertextValidityContext?: Address;
+  /**
+   * The ciphertext-validity proof instruction's data, when the proof was verified inline in the
+   * same transaction (one-transaction transfers). It holds the amount encrypted to the recipient.
+   */
+  ciphertextValidityProof?: Uint8Array;
 };
 
 /** Confidential transfer instructions in a transaction. */
 export function confidentialTransfersIn(transaction: DecodedTransaction): ConfidentialTransferRecord[] {
-  return transaction.instructions.flatMap(({ programAddress, accounts, data }) => {
+  return transaction.instructions.flatMap(({ programAddress, accounts, data }, position) => {
     if (programAddress !== TOKEN_2022_PROGRAM_ADDRESS) return [];
     if (!isConfidentialInstructionData(data, CONFIDENTIAL_TRANSFER_CONFIDENTIAL_TRANSFER_DISCRIMINATOR)) return [];
     // Accounts: source, mint, destination, then either the three proof context accounts and the
     // authority (7 in total) or the instructions sysvar for inline proofs.
     const [sourceToken, , destinationToken] = accounts;
     if (!sourceToken || !destinationToken) return [];
+    // An inline proof sits in a sibling instruction, at the offset the transfer names.
+    const offset = getConfidentialTransferInstructionDataDecoder().decode(data).ciphertextValidityProofInstructionOffset;
+    const sibling = offset !== 0 ? transaction.instructions[position + offset] : undefined;
+    const inlineProof =
+      sibling?.programAddress === ZK_ELGAMAL_PROOF_PROGRAM_ADDRESS &&
+      sibling.data[0] === ZK_VERIFY_BATCHED_GROUPED_CIPHERTEXT_3_HANDLES_VALIDITY
+        ? sibling.data
+        : undefined;
     return [
       {
         signature: transaction.signature,
@@ -97,6 +113,7 @@ export function confidentialTransfersIn(transaction: DecodedTransaction): Confid
         destinationToken,
         data,
         ...(accounts.length === 7 && accounts[4] ? { ciphertextValidityContext: accounts[4] } : {}),
+        ...(inlineProof ? { ciphertextValidityProof: inlineProof } : {}),
       },
     ];
   });

@@ -13,7 +13,7 @@ import {
 // Transfer amounts are encrypted in two halves: the low 16 bits and the high 32 bits.
 export const TRANSFER_AMOUNT_LO_BIT_LENGTH = 16n;
 
-export type AuditedTransfer = Omit<ConfidentialTransferRecord, 'data' | 'ciphertextValidityContext'> & {
+export type AuditedTransfer = Omit<ConfidentialTransferRecord, 'data' | 'ciphertextValidityContext' | 'ciphertextValidityProof'> & {
   /** The decrypted amount, in base units. */
   amount: bigint;
 };
@@ -36,7 +36,7 @@ function parseCiphertext(bytes: ReadonlyUint8Array): ElGamalCiphertext {
 }
 
 function audit(
-  { data, ciphertextValidityContext: _, ...transfer }: ConfidentialTransferRecord,
+  { data, ciphertextValidityContext: _context, ciphertextValidityProof: _proof, ...transfer }: ConfidentialTransferRecord,
   auditorSecret: ElGamalSecretKey,
 ): AuditedTransfer {
   return { ...transfer, amount: decryptAuditorAmount(data, auditorSecret) };

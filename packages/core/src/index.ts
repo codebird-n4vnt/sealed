@@ -8,3 +8,4 @@ export * from './history';
 export * from './keys';
 export * from './sponsor';
 export * from './vault';
+export * from './one-transaction';

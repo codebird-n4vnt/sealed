@@ -15,23 +15,16 @@ import { TRANSACTION_VERSION } from '../config';
 import { payrollApprovalMessage } from '../siws';
 import { Company, Member, Payment, PayrollRun, type CompanyDoc, type PaymentDoc } from './models';
 import { decryptAmount, encryptAmount } from './secrets';
+import { settlePayment, type PaymentState, type PaymentStatus } from './settle';
 import { companyChain, memberAccountState, type CompanyChain } from './solana';
 
-// Payroll runs are persisted jobs. Payments move pending → proving → submitted → confirmed | failed.
-// Transfers from one treasury must run in order (each proof depends on the current balance), so a
-// run pays one employee at a time. Nobody may be paid twice: before retrying a payment that was in
-// flight, the engine waits until that attempt can no longer land (its blockhash has expired), then
-// compares the treasury balance with the balance recorded before the attempt.
+// Payroll runs are persisted jobs. Transfers from one treasury must run in order (each proof
+// depends on the current balance), so a run pays one employee at a time. Each payment is settled
+// by settle.ts, which makes sure nobody is paid twice.
 
 const HEARTBEAT_STALE_MS = 60_000;
-/** A blockhash expires after 150 blocks, about a minute; this leaves a wide margin. */
-const IN_FLIGHT_MS = 180_000;
-const MAX_WAIT_MS = 600_000;
-/** Attempts per payment when errors look transient (a busy or rate-limited RPC). */
-const MAX_ATTEMPTS = 3;
-const TRANSIENT = /429|Too Many Requests|WebSocket|timed? ?out|fetch failed|ECONNRESET|50[23]|block height exceeded|Blockhash not found/i;
 
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 const activeRuns = new Set<string>();
 
 export type DraftItem = { memberId: string; name: string; wallet: string; amount: bigint };
@@ -109,48 +102,6 @@ async function treasuryAvailable(chain: CompanyChain): Promise<bigint> {
   return balance.availableBalance;
 }
 
-/** The signature and expiry of the transaction an error came from, if it got as far as signing. */
-function signedTransaction(error: unknown): { signature: string; lastValidBlockHeight?: bigint } | undefined {
-  type Context = { signature?: string; message?: { lifetimeConstraint?: { lastValidBlockHeight?: bigint } } };
-  const context = (error as { context?: { transactionPlanResult?: { context?: Context } } } | undefined)?.context
-    ?.transactionPlanResult?.context;
-  if (!context?.signature) return undefined;
-  return { signature: context.signature, lastValidBlockHeight: context.message?.lifetimeConstraint?.lastValidBlockHeight };
-}
-
-/**
- * Waits until a transaction that may still be in flight has settled: it shows up on-chain
- * (confirmed or failed), or it can no longer land, being past its last valid block height when
- * that's known, else IN_FLIGHT_MS after it was submitted. Keeps the run's heartbeat fresh
- * meanwhile, so no second worker picks the run up.
- */
-async function waitOutInFlight(
-  chain: CompanyChain,
-  attempt: { signature?: string; lastValidBlockHeight?: bigint; submittedAt?: Date | null },
-  beat: () => Promise<unknown>,
-): Promise<void> {
-  const started = Date.now();
-  const deadline = (attempt.submittedAt?.getTime() ?? started) + IN_FLIGHT_MS;
-  for (;;) {
-    await beat();
-    if (attempt.signature) {
-      const signature = attempt.signature as Signature;
-      const { value } = await withReadRetry(() => chain.client.rpc.getSignatureStatuses([signature]).send());
-      const status = value[0];
-      if (status && (status.err || status.confirmationStatus !== 'processed')) return;
-    }
-    if (attempt.lastValidBlockHeight !== undefined) {
-      const height = await withReadRetry(() => chain.client.rpc.getBlockHeight({ commitment: 'finalized' }).send());
-      if (height > attempt.lastValidBlockHeight) return;
-    } else if (Date.now() >= deadline) {
-      return;
-    }
-    // Stop the worker rather than guess; the run resumes later from the recorded state.
-    if (Date.now() - started > MAX_WAIT_MS) throw new Error('Timed out waiting for an in-flight payment to expire.');
-    await sleep(5_000);
-  }
-}
-
 async function work(runId: string): Promise<void> {
   const run = await PayrollRun.findById(runId);
   if (!run || run.status !== 'running') return;
@@ -192,88 +143,57 @@ async function findLandedSignature(chain: CompanyChain, payment: PaymentDoc): Pr
   return undefined;
 }
 
-async function confirmLanded(chain: CompanyChain, payment: PaymentDoc, signature?: string) {
-  payment.status = 'confirmed';
-  payment.error = undefined;
-  payment.signature ??= signature ?? (await findLandedSignature(chain, payment));
-  await payment.save();
-}
-
-async function fail(payment: PaymentDoc, error: string) {
-  payment.status = 'failed';
-  payment.error = error;
-  await payment.save();
-}
-
 async function settle(
   company: CompanyDoc,
   chain: CompanyChain,
   payment: PaymentDoc,
   beat: () => Promise<unknown>,
 ): Promise<void> {
-  const amount = decryptAmount(payment.amountEnc);
-  let available = await treasuryAvailable(chain);
-
-  // A previous attempt was interrupted: find out whether it landed before trying again.
-  if ((payment.status === 'proving' || payment.status === 'submitted') && payment.treasuryBeforeEnc) {
-    const before = decryptAmount(payment.treasuryBeforeEnc);
-    if (available === before && payment.status === 'submitted') {
-      // It was handed to the network and may still land: wait until it can't, then look again.
-      await waitOutInFlight(chain, { submittedAt: payment.submittedAt }, beat);
-      available = await treasuryAvailable(chain);
-    }
-    if (available === before - amount) return confirmLanded(chain, payment);
-    if (available !== before) {
-      return fail(payment, 'The treasury balance changed while this payment was in flight. Check the explorer before paying again.');
-    }
-  }
-
-  if (available < amount) return fail(payment, 'Not enough in the confidential treasury.');
-  const account = await memberAccountState(company, payment.wallet);
-  if (!account.configured || !account.approved) return fail(payment, "The employee's private account isn't set up yet.");
-
-  payment.treasuryBeforeEnc = encryptAmount(available);
-  payment.status = 'proving';
-  payment.attempts += 1;
-  await payment.save();
-
-  try {
-    const result = await payConfidential(chain.client, {
-      mint: chain.mint,
-      from: { owner: chain.vault, keys: chain.keys },
-      to: payment.wallet as Address,
-      amount,
-      proofDelivery: TRANSACTION_VERSION === 1 ? 'one-transaction' : 'record',
-      onProofsReady: async () => {
-        payment.status = 'submitted';
-        payment.submittedAt = new Date();
-        await payment.save();
-      },
-    });
-    payment.status = 'confirmed';
-    payment.signature = result.signature;
-    payment.error = undefined;
-    await payment.save();
-  } catch (error) {
-    // Sending or confirming can fail after the transaction reached a validator (e.g. a
-    // rate-limited RPC), so a signed transaction may still land. Wait until it can't.
-    const signed = signedTransaction(error);
-    if (signed) {
-      await waitOutInFlight(chain, { ...signed, submittedAt: payment.submittedAt }, beat);
-    }
-    if ((await treasuryAvailable(chain)) === available - amount) return confirmLanded(chain, payment, signed?.signature);
-
-    // It didn't land and now can't, so trying again is safe.
-    const message = error instanceof Error ? error.message.split('\n')[0]! : 'Transfer failed.';
-    console.error(`Payment ${payment.id} attempt ${payment.attempts} failed:`, error);
-    if (payment.attempts < MAX_ATTEMPTS && TRANSIENT.test(message)) {
-      payment.status = 'pending';
-      payment.error = message;
+  const state: PaymentState = {
+    status: payment.status as PaymentStatus,
+    attempts: payment.attempts,
+    treasuryBefore: payment.treasuryBeforeEnc ? decryptAmount(payment.treasuryBeforeEnc) : undefined,
+    submittedAt: payment.submittedAt ?? undefined,
+    signature: payment.signature ?? undefined,
+    error: payment.error ?? undefined,
+  };
+  await settlePayment(state, {
+    amount: decryptAmount(payment.amountEnc),
+    treasury: () => treasuryAvailable(chain),
+    accountReady: async () => {
+      const account = await memberAccountState(company, payment.wallet);
+      return account.configured && account.approved;
+    },
+    pay: async onSubmitted => {
+      const result = await payConfidential(chain.client, {
+        mint: chain.mint,
+        from: { owner: chain.vault, keys: chain.keys },
+        to: payment.wallet as Address,
+        amount: decryptAmount(payment.amountEnc),
+        proofDelivery: TRANSACTION_VERSION === 1 ? 'one-transaction' : 'record',
+        onProofsReady: onSubmitted,
+      });
+      return result.signature;
+    },
+    landedSignature: () => findLandedSignature(chain, payment),
+    signatureSettled: async signature => {
+      const { value } = await withReadRetry(() => chain.client.rpc.getSignatureStatuses([signature as Signature]).send());
+      const status = value[0];
+      return !!status && (!!status.err || status.confirmationStatus !== 'processed');
+    },
+    blockHeight: () => withReadRetry(() => chain.client.rpc.getBlockHeight({ commitment: 'finalized' }).send()),
+    save: async next => {
+      payment.status = next.status;
+      payment.attempts = next.attempts;
+      payment.treasuryBeforeEnc = next.treasuryBefore === undefined ? undefined : encryptAmount(next.treasuryBefore);
+      payment.submittedAt = next.submittedAt;
+      payment.signature = next.signature;
+      payment.error = next.error;
       await payment.save();
-      await sleep(2_000 * 2 ** (payment.attempts - 1)); // give a rate-limited RPC room: 2s, then 4s
-      await beat();
-      return settle(company, chain, payment, beat);
-    }
-    await fail(payment, message);
-  }
+    },
+    beat,
+    now: () => Date.now(),
+    sleep,
+    log: (message, error) => console.error(`Payment ${payment.id} ${message}:`, error),
+  });
 }

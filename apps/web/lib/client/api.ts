@@ -1,5 +1,7 @@
 'use client';
 
+import { describeFailure } from '../solana-errors';
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -29,7 +31,7 @@ export function errorMessage(error: unknown): string {
   if (error instanceof Error) {
     // Wallet rejections read better as a short sentence.
     if (/reject|denied|cancel/i.test(error.message)) return 'You cancelled the request in your wallet.';
-    return error.message.split('\n')[0] ?? 'Something went wrong.';
+    return describeFailure(error);
   }
   return 'Something went wrong.';
 }

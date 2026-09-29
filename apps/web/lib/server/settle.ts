@@ -9,6 +9,8 @@
  * compares the treasury balance with the balance recorded before the attempt.
  */
 
+import { describeFailure, isTransient } from '../solana-errors';
+
 export type PaymentStatus = 'pending' | 'proving' | 'submitted' | 'confirmed' | 'failed';
 
 /** What the engine persists about a payment between steps. */
@@ -54,7 +56,6 @@ const MAX_WAIT_MS = 600_000;
 const POLL_MS = 5_000;
 /** Attempts per payment when errors look transient (a busy or rate-limited RPC). */
 export const MAX_ATTEMPTS = 3;
-const TRANSIENT = /429|Too Many Requests|WebSocket|timed? ?out|fetch failed|ECONNRESET|50[23]|block height exceeded|Blockhash not found/i;
 
 type InFlight = { signature?: string; lastValidBlockHeight?: bigint; submittedAt?: Date };
 
@@ -156,9 +157,9 @@ export async function settlePayment(state: PaymentState, deps: SettleDeps): Prom
     if ((await deps.treasury()) === available - deps.amount) return confirm(state, deps, inFlight?.signature);
 
     // It didn't land and now can't, so trying again is safe.
-    const message = error instanceof Error ? error.message.split('\n')[0]! : 'Transfer failed.';
+    const message = describeFailure(error);
     deps.log?.(`attempt ${state.attempts} failed`, error);
-    if (state.attempts < MAX_ATTEMPTS && TRANSIENT.test(message)) {
+    if (state.attempts < MAX_ATTEMPTS && isTransient(error)) {
       state.status = 'pending';
       state.error = message;
       await deps.save(state);

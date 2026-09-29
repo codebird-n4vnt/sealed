@@ -3,8 +3,18 @@
  * heights, a treasury, and transactions that land late or never. The property that matters most:
  * however sending fails, the treasury is debited at most once per payment.
  */
+import {
+  SOLANA_ERROR__FAILED_TO_SEND_TRANSACTION,
+  SOLANA_ERROR__FAILED_TO_SEND_TRANSACTIONS,
+  SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR,
+  SOLANA_ERROR__RPC_SUBSCRIPTIONS__CHANNEL_FAILED_TO_CONNECT,
+  SOLANA_ERROR__TRANSACTION__FAILED_TO_ESTIMATE_COMPUTE_LIMIT,
+  SolanaError,
+  type SolanaErrorCode,
+} from '@solana/kit';
 import { describe, expect, it } from 'vitest';
 
+import { describeFailure, isTransient } from '../solana-errors';
 import { IN_FLIGHT_MS, MAX_ATTEMPTS, settlePayment, type PaymentState, type PaymentStatus, type SettleDeps } from './settle';
 
 const AMOUNT = 4_200n;
@@ -14,17 +24,21 @@ const BLOCKHASH_LIFETIME = 150n;
 /** What one call to `pay` does. `landsAfterMs`: an in-flight transaction lands that much later. */
 type Attempt =
   | { kind: 'ok' }
-  | { kind: 'unsigned'; message?: string } // failed before signing, e.g. fetching a blockhash
-  | { kind: 'signed'; landsAfterMs?: number; message?: string } // signed and sent, then the RPC failed
+  | { kind: 'unsigned' } // rate-limited before signing, e.g. fetching a blockhash
+  | { kind: 'simulation' } // the pre-send simulation failed, e.g. on a stale balance
+  | { kind: 'signed'; landsAfterMs?: number } // signed and sent, then the RPC failed
   | { kind: 'plural'; landsAfterMs?: number } // a multi-transaction plan failed; no one signature
   | { kind: 'fatal'; message: string }; // rejected outright, e.g. a program error
 
-/** Mimics kit's send errors, which keep the failed result on a non-enumerable context field. */
-function sendError(message: string, transactionPlanResult: unknown): Error {
-  const error = new Error(message);
-  Object.defineProperty(error, 'context', { value: {} });
-  Object.defineProperty((error as unknown as { context: object }).context, 'transactionPlanResult', { value: transactionPlanResult });
-  return error;
+const error = (code: SolanaErrorCode, context: object = {}) => new SolanaError(code as never, context as never);
+const rateLimited = () => error(SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR, { headers: new Headers(), message: 'Too Many Requests', statusCode: 429 });
+const disconnected = () => error(SOLANA_ERROR__RPC_SUBSCRIPTIONS__CHANNEL_FAILED_TO_CONNECT, { errorEvent: {} });
+
+/** Built like kit's executor errors: the cause wrapped, the failed result on a hidden context field. */
+function sendError(code: SolanaErrorCode, cause: unknown, transactionPlanResult: unknown): Error {
+  const context = { cause, causeMessage: '' };
+  Object.defineProperty(context, 'transactionPlanResult', { value: transactionPlanResult, enumerable: false });
+  return error(code, context);
 }
 
 function world(input: { treasury?: bigint; attempts: Attempt[]; accountReady?: boolean }) {
@@ -71,16 +85,21 @@ function world(input: { treasury?: bigint; attempts: Attempt[]; accountReady?: b
           land(signature);
           return signature;
         case 'unsigned':
-          throw sendError(attempt.message ?? 'Failed to send transaction: HTTP error (429): Too Many Requests', { kind: 'single', context: {} });
+          throw sendError(SOLANA_ERROR__FAILED_TO_SEND_TRANSACTION, rateLimited(), { kind: 'single', context: {} });
+        case 'simulation':
+          throw sendError(SOLANA_ERROR__FAILED_TO_SEND_TRANSACTION, error(SOLANA_ERROR__TRANSACTION__FAILED_TO_ESTIMATE_COMPUTE_LIMIT), {
+            kind: 'single',
+            context: {},
+          });
         case 'signed':
           later(signature, attempt.landsAfterMs);
-          throw sendError(attempt.message ?? `Failed to send transaction (${signature}): HTTP error (429): Too Many Requests`, {
+          throw sendError(SOLANA_ERROR__FAILED_TO_SEND_TRANSACTION, rateLimited(), {
             kind: 'single',
             context: { signature, message: { lifetimeConstraint: { lastValidBlockHeight: height() + BLOCKHASH_LIFETIME } } },
           });
         case 'plural':
           later(signature, attempt.landsAfterMs);
-          throw sendError('Failed to send transactions: WebSocket failed to connect', { kind: 'sequential', plans: [] });
+          throw sendError(SOLANA_ERROR__FAILED_TO_SEND_TRANSACTIONS, disconnected(), { kind: 'sequential', plans: [] });
       }
     },
     landedSignature: async () => [...landed].at(-1),
@@ -135,6 +154,14 @@ describe('settlePayment', () => {
     expect(w.retriesAt).toEqual([0, 2_000]); // no wait for expiry: nothing was sent
   });
 
+  it('retries a failed pre-send simulation, recognised by its error code alone', async () => {
+    const w = world({ attempts: [{ kind: 'simulation' }, { kind: 'ok' }] });
+    const state = fresh();
+    await settlePayment(state, w.deps);
+    expect(state).toMatchObject({ status: 'confirmed', attempts: 2 });
+    expect(w.debits).toBe(1);
+  });
+
   it('does not pay twice when a signed transaction lands after its send failed', async () => {
     const w = world({ attempts: [{ kind: 'signed', landsAfterMs: 20_000 }] });
     const state = fresh();
@@ -185,7 +212,7 @@ describe('settlePayment', () => {
     const w = world({ attempts: Array.from({ length: 5 }, () => ({ kind: 'unsigned' as const })) });
     const state = fresh();
     await settlePayment(state, w.deps);
-    expect(state).toMatchObject({ status: 'failed', attempts: MAX_ATTEMPTS });
+    expect(state).toMatchObject({ status: 'failed', attempts: MAX_ATTEMPTS, error: 'The RPC is rate-limiting requests (HTTP 429).' });
     expect(w.retriesAt).toHaveLength(MAX_ATTEMPTS);
     expect(w.debits).toBe(0);
   });
@@ -252,5 +279,23 @@ describe('settlePayment, resuming after a crash', () => {
     expect(state.status).toBe('failed');
     expect(state.error).toMatch(/treasury balance changed/);
     expect(w.retriesAt).toHaveLength(0);
+  });
+});
+
+describe('failure classification', () => {
+  it('reads codes, not messages, so production builds behave the same', () => {
+    expect(isTransient(sendError(SOLANA_ERROR__FAILED_TO_SEND_TRANSACTION, rateLimited(), { kind: 'single' }))).toBe(true);
+    expect(isTransient(error(SOLANA_ERROR__RPC__TRANSPORT_HTTP_ERROR, { headers: new Headers(), message: '', statusCode: 400 }))).toBe(false);
+    expect(isTransient(sendError(SOLANA_ERROR__FAILED_TO_SEND_TRANSACTIONS, disconnected(), { kind: 'sequential' }))).toBe(true);
+    expect(isTransient(new Error('custom program error: 0x1'))).toBe(false);
+    expect(isTransient(new TypeError('fetch failed'))).toBe(true);
+  });
+
+  it('describes failures readably', () => {
+    expect(describeFailure(sendError(SOLANA_ERROR__FAILED_TO_SEND_TRANSACTIONS, disconnected(), { kind: 'sequential' }))).toBe(
+      'Lost the connection to the RPC.',
+    );
+    expect(describeFailure(error(SOLANA_ERROR__TRANSACTION__FAILED_TO_ESTIMATE_COMPUTE_LIMIT))).toMatch(/simulation/);
+    expect(describeFailure(new Error('custom program error: 0x1\nlogs…'))).toBe('custom program error: 0x1');
   });
 });

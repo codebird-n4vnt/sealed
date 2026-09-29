@@ -31,6 +31,8 @@ Recorded on devnet with the seeded demo company. Amounts appear only for the peo
 | ![Company dashboard](docs/screenshots/dashboard.webp) | ![Payroll run](docs/screenshots/payroll-run.webp) |
 | **Employee portal:** pay decrypted in the browser, 0 SOL in fees | **Accountant view:** every amount decrypted with the auditor key |
 | ![Employee portal](docs/screenshots/employee.webp) | ![Accountant view](docs/screenshots/accountant.webp) |
+| **USDC backing** (local mainnet fork): USDC wraps 1:1 into the treasury | **Cashing out:** the employee turns public pay back into USDC, 0 SOL |
+| ![USDC-backed treasury](docs/screenshots/usdc-treasury.webp) | ![Cash out to USDC](docs/screenshots/usdc-cash-out.webp) |
 
 ## How it works
 

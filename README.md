@@ -21,6 +21,16 @@ moved into or out of confidential balances (funding the treasury, withdrawing).
 > the accountant view all work end to end on devnet and on a Surfpool mainnet fork. The Sealed Vault
 > program is tested on the mainnet fork; its devnet deploy is pending devnet SOL.
 
+## Screenshots
+
+Recorded on devnet with the seeded demo company. Amounts appear only for the people allowed to see them.
+
+| Company dashboard: a confidential treasury and payroll runs | A 10-person payroll run, paid in 25 seconds |
+|---|---|
+| ![Company dashboard](docs/screenshots/dashboard.webp) | ![Payroll run](docs/screenshots/payroll-run.webp) |
+| **Employee portal:** pay decrypted in the browser, 0 SOL in fees | **Accountant view:** every amount decrypted with the auditor key |
+| ![Employee portal](docs/screenshots/employee.webp) | ![Accountant view](docs/screenshots/accountant.webp) |
+
 ## How it works
 
 ![Sealed architecture](docs/architecture.png)

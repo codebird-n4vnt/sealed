@@ -18,8 +18,9 @@ Sealed hides amounts and balances, not identities: wallet addresses stay public,
 moved into or out of confidential balances (funding the treasury, withdrawing).
 
 > **Status:** test networks only. The core flow, the company dashboard, the employee portal and
-> the accountant view all work end to end on devnet and on a Surfpool mainnet fork. The Sealed Vault
-> program is tested on the mainnet fork; its devnet deploy is pending devnet SOL.
+> the accountant view all work end to end on devnet and on a Surfpool mainnet fork. USDC backing
+> through the Sealed Vault works end to end in the app on the mainnet fork; the program's devnet
+> deploy is pending devnet SOL.
 
 ## Screenshots
 
@@ -59,9 +60,10 @@ Recorded on devnet with the seeded demo company. Amounts appear only for the peo
 - **Each company has its own token,** with manual approval, so only its team can hold it. The
   **Sealed Vault** program ([`programs/sealed-vault`](programs/sealed-vault)) backs it 1:1 with USDC:
   `wrap` takes USDC in and mints company tokens, and `unwrap` burns them and pays USDC out. Only
-  the vault can mint, and every instruction checks on-chain that supply equals the USDC held. The
-  web app still funds treasuries with a test token; the vault flow is tested end to end in
-  `packages/core`.
+  the vault can mint, and every instruction checks on-chain that supply equals the USDC held.
+  Where the program is deployed, a company can choose USDC backing: it funds payroll by sending
+  USDC to its funding address, and employees cash out to USDC, fees paid by the company. Elsewhere
+  a company uses a test token.
 
 ## Repo layout
 

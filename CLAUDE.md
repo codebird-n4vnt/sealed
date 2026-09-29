@@ -530,8 +530,12 @@ milestone while the current one is broken.
     - refused: minting around the vault, registering a mint the vault can't control, redeeming
       against another company's vault, and over-unwrapping.
   - Rust LiteSVM tests were dropped: that build needed several GB of disk the machine didn't have.
-  - The web app still funds treasuries with test tokens, and the sponsor policy doesn't cover
-    `unwrap` yet, so in the test the company pays its fee directly.
+  - Sep 29: ✅ in the product. Where the program is deployed, companies can be USDC-backed: setup
+    hands minting to the vault and opens a USDC funding address; the dashboard wraps USDC that
+    arrives there into the confidential treasury; employees cash out to USDC in one sponsored
+    transaction (the sponsor policy now allows exactly that `unwrap` and their USDC account).
+    Checked in the browser on Surfpool: 10,000 USDC wrapped, a payroll run, and an employee
+    cashing out 600 USDC with 0 SOL; supply and USDC held both 9,400.
   - Devnet deploy needs about 1.8 devnet SOL, and devnet airdrops were rate-limited. Fund the
     deployer from faucet.solana.com, then run
     `pnpm vault:deploy -u http://127.0.0.1:8898 -k .keys/employer.json`

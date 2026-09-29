@@ -7,6 +7,8 @@ import {
   AuthorityType,
   fetchMint,
   fetchToken,
+  findAssociatedTokenPda,
+  getCreateAssociatedTokenIdempotentInstruction,
   getSetAuthorityInstruction,
   TOKEN_2022_PROGRAM_ADDRESS,
 } from '@solana-program/token-2022';
@@ -22,6 +24,7 @@ import {
   type TransactionSigner,
 } from '@solana/kit';
 
+import { tokenAccountAddress } from './accounts';
 import type { SealedClient } from './client';
 
 export const SEALED_VAULT_PROGRAM_ADDRESS = 'CTfg335Wow4yDCZGizkDnFk3SCT2GChkNsZVicTgbffm' as Address;
@@ -177,4 +180,45 @@ export async function fetchVaultBacking(client: SealedClient, companyMint: Addre
     fetchToken(client.rpc, await findUsdcVaultAddress(company)),
   ]);
   return { supply: mint.supply, usdcHeld: vault.amount };
+}
+
+/** Whether the Sealed Vault program is deployed on the client's cluster. */
+export async function isVaultProgramDeployed(client: SealedClient): Promise<boolean> {
+  const { value } = await client.rpc.getAccountInfo(SEALED_VAULT_PROGRAM_ADDRESS, { encoding: 'base64' }).send();
+  return value?.executable ?? false;
+}
+
+/** An owner's USDC account: the associated token account on the classic token program. */
+export async function usdcAccountAddress(owner: Address, usdcMint: Address): Promise<Address> {
+  const [address] = await findAssociatedTokenPda({ owner, mint: usdcMint, tokenProgram: TOKEN_PROGRAM_ADDRESS });
+  return address;
+}
+
+/**
+ * Cashes a holder's public company tokens out to USDC in their own USDC account (created if
+ * needed): one transaction, with the client's fee payer covering the fee and that account's rent.
+ */
+export async function cashOutToUsdc(
+  client: SealedClient,
+  input: { holder: TransactionSigner; companyMint: Address; usdcMint: Address; amount: bigint },
+): Promise<Signature> {
+  const recipientUsdc = await usdcAccountAddress(input.holder.address, input.usdcMint);
+  const result = await client.sendTransaction([
+    getCreateAssociatedTokenIdempotentInstruction({
+      payer: client.payer,
+      ata: recipientUsdc,
+      owner: input.holder.address,
+      mint: input.usdcMint,
+      tokenProgram: TOKEN_PROGRAM_ADDRESS,
+    }),
+    await getUnwrapInstruction({
+      holder: input.holder,
+      companyMint: input.companyMint,
+      usdcMint: input.usdcMint,
+      holderToken: await tokenAccountAddress(input.holder.address, input.companyMint),
+      recipientUsdc,
+      amount: input.amount,
+    }),
+  ]);
+  return result.context.signature;
 }

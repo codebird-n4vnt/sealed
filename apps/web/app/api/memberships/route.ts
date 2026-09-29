@@ -1,3 +1,4 @@
+import { USDC_MINT } from '@/lib/config';
 import { json, route } from '@/lib/server/http';
 import { Company, Member } from '@/lib/server/models';
 import { requireWallet } from '@/lib/server/session';
@@ -26,6 +27,7 @@ export const GET = route(async () => {
             mint: company.mint.address,
             vault: company.vault.address,
             treasuryAccount: company.treasuryAccount ?? null,
+            usdcMint: company.backing === 'usdc' ? USDC_MINT : null,
           },
         },
       ];

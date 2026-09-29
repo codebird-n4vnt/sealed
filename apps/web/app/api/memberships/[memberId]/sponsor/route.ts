@@ -1,6 +1,8 @@
 import type { Address } from '@solana/kit';
 
-import { checkSponsoredTransaction, sponsorTransaction, tokenAccountAddress } from '@sealed/core';
+import { checkSponsoredTransaction, sponsorTransaction, tokenAccountAddress, usdcAccountAddress } from '@sealed/core';
+
+import { USDC_MINT } from '@/lib/config';
 
 import { loadOwnMembership } from '@/lib/server/access';
 import { badRequest, HttpError, json, readJson, route } from '@/lib/server/http';
@@ -31,6 +33,10 @@ export const POST = route<{ memberId: string }>(async (request, { params }) => {
     owner: wallet as Address,
     token: await tokenAccountAddress(wallet as Address, mint),
     mint,
+    // USDC-backed companies also pay for cashing out to the employee's own USDC account.
+    ...(company.backing === 'usdc'
+      ? { usdc: { mint: USDC_MINT as Address, account: await usdcAccountAddress(wallet as Address, USDC_MINT as Address) } }
+      : {}),
   };
   const { newAccounts } = checkSponsoredTransaction(wire, { ...policy, sponsor: vault.address });
 

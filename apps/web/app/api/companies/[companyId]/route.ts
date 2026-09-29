@@ -1,9 +1,10 @@
+import { USDC_MINT } from '@/lib/config';
 import { loadCompanyAsAdmin } from '@/lib/server/access';
 import { json, route } from '@/lib/server/http';
 import { Member, PayrollRun } from '@/lib/server/models';
 import { decryptAmount } from '@/lib/server/secrets';
 import { requireWallet } from '@/lib/server/session';
-import { treasuryBalances, vaultSol } from '@/lib/server/solana';
+import { treasuryBalances, usdcFundingAddress, vaultSol } from '@/lib/server/solana';
 
 /** Everything the company dashboard shows. Admin only. */
 export const GET = route<{ companyId: string }>(async (_, { params }) => {
@@ -38,6 +39,9 @@ export const GET = route<{ companyId: string }>(async (_, { params }) => {
       treasuryAccount: company.treasuryAccount ?? null,
       auditorElgamalPubkey: company.auditorElgamalPubkey,
       accountantWallets: company.accountantWallets,
+      backing: company.backing,
+      usdcMint: company.backing === 'usdc' ? USDC_MINT : null,
+      usdcFundingAddress: company.backing === 'usdc' ? await usdcFundingAddress(company) : null,
     },
     balances,
     chainError,

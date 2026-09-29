@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import {
   applyPendingBalance,
+  cashOutToUsdc,
   confidentialState,
   fetchReceivedPayments,
   formatAmount,
@@ -37,6 +38,8 @@ export type Membership = {
     mint: string;
     vault: string;
     treasuryAccount: string | null;
+    /** Set when the company's token is backed 1:1 by USDC: employees can cash out to it. */
+    usdcMint: string | null;
   };
 };
 
@@ -209,13 +212,13 @@ export function MembershipCard({ account, membership, onChange }: { account: UiW
   const owner = useTransactionSigner(account);
   const { balances, error, reload } = useBalances(account, membership);
   const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [busy, setBusy] = useState<'collect' | 'withdraw' | null>(null);
+  const [busy, setBusy] = useState<'collect' | 'withdraw' | 'cashout' | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const { company } = membership;
   const mint = company.mint as Address;
   const version = employeeTransactionVersion(account);
 
-  const act = async (kind: 'collect' | 'withdraw', action: () => Promise<unknown>) => {
+  const act = async (kind: 'collect' | 'withdraw' | 'cashout', action: () => Promise<unknown>) => {
     setBusy(kind);
     setActionError(null);
     try {
@@ -315,6 +318,24 @@ export function MembershipCard({ account, membership, onChange }: { account: UiW
             Withdrawn amounts become public. Withdrawing exactly your salary reveals it; withdraw a different amount, or keep
             funds in your private balance.
           </Notice>
+          {company.usdcMint && balances.public > 0n && (
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                variant="secondary"
+                loading={busy === 'cashout'}
+                disabled={!!busy}
+                onClick={() =>
+                  act('cashout', async () => {
+                    const client = await createEmployeeClient({ memberId: membership.memberId, vault: company.vault, transactionVersion: version });
+                    await cashOutToUsdc(client, { holder: owner, companyMint: mint, usdcMint: company.usdcMint as Address, amount: balances.public });
+                  })
+                }
+              >
+                Cash out <Amount value={balances.public} symbol="USDC" decimals={company.decimals} />
+              </Button>
+              <span className="text-sm text-muted">Sends your public balance to your wallet as USDC, 1:1. {company.name} pays the fee.</span>
+            </div>
+          )}
         </div>
       )}
       <ErrorText error={actionError} />

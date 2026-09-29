@@ -3,7 +3,7 @@ import { isAddress } from '@solana/kit';
 import { badRequest, json, readJson, route } from '@/lib/server/http';
 import { Company } from '@/lib/server/models';
 import { requireWallet } from '@/lib/server/session';
-import { airdropToVault, generateStoredKeypair } from '@/lib/server/solana';
+import { airdropToVault, generateStoredKeypair, vaultAvailable } from '@/lib/server/solana';
 
 /** Companies the signed-in wallet administers. */
 export const GET = route(async () => {
@@ -20,18 +20,21 @@ export const GET = route(async () => {
  */
 export const POST = route(async request => {
   const wallet = await requireWallet();
-  const body = await readJson<{ name?: string; symbol?: string; auditorElgamalPubkey?: string }>(request);
+  const body = await readJson<{ name?: string; symbol?: string; auditorElgamalPubkey?: string; backing?: string }>(request);
   const name = body.name?.trim() ?? '';
   const symbol = body.symbol?.trim() ?? '';
   if (name.length < 2 || name.length > 80) throw badRequest('Company name must be 2 to 80 characters.');
   if (!/^[A-Za-z0-9]{2,10}$/.test(symbol)) throw badRequest('Token symbol must be 2 to 10 letters or digits.');
   if (!body.auditorElgamalPubkey || !isAddress(body.auditorElgamalPubkey)) throw badRequest('Missing auditor key.');
+  const backing = body.backing === 'usdc' ? 'usdc' : 'test';
+  if (backing === 'usdc' && !(await vaultAvailable())) throw badRequest('USDC backing needs the Sealed Vault program, which is not deployed here.');
 
   const company = await Company.create({
     name,
     symbol,
     adminWallet: wallet,
     auditorElgamalPubkey: body.auditorElgamalPubkey,
+    backing,
     vault: await generateStoredKeypair(),
     mint: await generateStoredKeypair(),
   });

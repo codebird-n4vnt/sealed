@@ -24,6 +24,8 @@ const companySchema = new Schema(
     mint: { type: storedKeypair, required: true },
     treasuryAccount: { type: String },
     status: { type: String, enum: ['setup', 'ready'], default: 'setup' },
+    /** `usdc`: the token is backed 1:1 by USDC through the Sealed Vault. `test`: test tokens (devnet). */
+    backing: { type: String, enum: ['test', 'usdc'], default: 'test' },
   },
   { timestamps: true },
 );

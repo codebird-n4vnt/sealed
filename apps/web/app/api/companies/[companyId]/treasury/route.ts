@@ -12,6 +12,7 @@ export const POST = route<{ companyId: string }>(async (request, { params }) => 
   const wallet = await requireWallet();
   const company = await loadCompanyAsAdmin((await params).companyId, wallet);
   if (company.status !== 'ready') throw badRequest('Finish setting up the company first.');
+  if (company.backing === 'usdc') throw badRequest('This company is backed by USDC: send USDC to its funding address instead.');
 
   const body = await readJson<{ amount?: string }>(request);
   let amount: bigint;

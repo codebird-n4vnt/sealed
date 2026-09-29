@@ -36,8 +36,11 @@ export type CompanyData = {
     treasuryAccount: string | null;
     auditorElgamalPubkey: string;
     accountantWallets: string[];
+    backing: 'test' | 'usdc';
+    usdcMint: string | null;
+    usdcFundingAddress: string | null;
   };
-  balances: { sol: string; public: string; confidential: string; pending: string } | null;
+  balances: { sol: string; public: string; confidential: string; pending: string; usdcWaiting?: string } | null;
   chainError: string | null;
   members: Array<{
     id: string;
@@ -124,6 +127,7 @@ export function TreasuryCard({ data, reload }: { data: CompanyData; reload: () =
   const [amount, setAmount] = useState('10000');
   const fund = useAction(reload);
   const { company, balances } = data;
+  if (company.backing === 'usdc') return <UsdcTreasuryCard data={data} reload={reload} />;
   return (
     <Card
       title="Treasury"
@@ -161,6 +165,53 @@ export function TreasuryCard({ data, reload }: { data: CompanyData; reload: () =
         team is not. In production, the Sealed Vault wraps USDC 1:1.
       </p>
       <ErrorText error={fund.error} />
+    </Card>
+  );
+}
+
+/** A USDC-backed treasury: USDC arrives at the funding address, then wraps 1:1 into the treasury. */
+function UsdcTreasuryCard({ data, reload }: { data: CompanyData; reload: () => void }) {
+  const wrap = useAction(reload);
+  const { company, balances } = data;
+  const waiting = BigInt(balances?.usdcWaiting ?? '0');
+  return (
+    <Card
+      title="Treasury"
+      description="Backed 1:1 by USDC through the Sealed Vault. Payroll is paid from the confidential balance; only your company can decrypt it."
+    >
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Stat
+          label="Confidential treasury"
+          value={balances ? <Amount value={balances.confidential} symbol={company.symbol} decimals={company.decimals} /> : '—'}
+          hint={`Encrypted on-chain, redeemable 1:1 for USDC`}
+        />
+        <Stat label="USDC waiting" value={balances ? <Amount value={waiting} symbol="USDC" decimals={company.decimals} /> : '—'} hint="At the funding address" />
+        <Stat label="SOL for fees" value={`${sol(balances?.sol)} SOL`} hint="Pays for you and your team" />
+      </div>
+      <div className="mt-5 grid gap-3">
+        <div className="grid gap-1 text-sm">
+          <span className="font-medium">Funding address</span>
+          <span className="text-muted">
+            Send USDC here from any wallet or exchange:{' '}
+            {company.usdcFundingAddress && <AddressLink address={company.usdcFundingAddress} />}
+          </span>
+        </div>
+        <div>
+          <Button
+            variant="secondary"
+            disabled={waiting === 0n}
+            loading={wrap.busy}
+            onClick={() => wrap.run(() => api(`/api/companies/${company.id}/treasury/wrap`, { method: 'POST' }))}
+          >
+            Move {waiting > 0n ? <Amount value={waiting} symbol="USDC" decimals={company.decimals} /> : 'USDC'} into the private treasury
+          </Button>
+        </div>
+        <p className="text-xs text-muted">
+          The funded total is public on-chain; how it&apos;s split between your team is not. The Sealed Vault program
+          checks on-chain that company tokens never exceed the USDC it holds.
+        </p>
+      </div>
+      <ErrorText error={wrap.error} />
     </Card>
   );
 }

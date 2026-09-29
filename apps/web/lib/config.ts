@@ -21,6 +21,14 @@ export const TRANSACTION_VERSION: 0 | 1 =
   : process.env.NEXT_PUBLIC_TRANSACTION_VERSION === '0' ? 0
   : CLUSTER === 'devnet' ? 1 : 0;
 
+/**
+ * The USDC that backs USDC-backed companies (through the Sealed Vault): Circle's devnet USDC on
+ * devnet, and mainnet USDC on a local mainnet fork (Surfpool). NEXT_PUBLIC_USDC_MINT overrides.
+ */
+export const USDC_MINT =
+  process.env.NEXT_PUBLIC_USDC_MINT ||
+  (CLUSTER === 'devnet' ? '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU' : 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+
 /** The Wallet Standard chain wallets must support to use Sealed. */
 export const WALLET_CHAIN = `solana:${CLUSTER}` as const;
 

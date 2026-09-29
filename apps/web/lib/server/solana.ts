@@ -3,10 +3,13 @@ import 'server-only';
 import { fetchMaybeMint, fetchMaybeToken } from '@solana-program/token-2022';
 import {
   createKeyPairSignerFromPrivateKeyBytes,
+  createNoopSigner,
   lamports,
   type Address,
   type KeyPairSigner,
 } from '@solana/kit';
+
+import { getCreateAssociatedTokenIdempotentInstruction } from '@solana-program/token-2022';
 
 import {
   approveConfidentialAccount,
@@ -15,15 +18,22 @@ import {
   createSealedClient,
   depositToConfidential,
   deriveKeys,
+  findVaultCompanyAddress,
   getConfidentialBalance,
+  getWrapInstruction,
+  isVaultProgramDeployed,
   mintTestTokens,
+  registerVaultBackedMint,
   setupConfidentialAccount,
+  TOKEN_PROGRAM_ADDRESS,
   tokenAccountAddress,
+  usdcAccountAddress,
   type ConfidentialKeys,
   type SealedClient,
 } from '@sealed/core';
 
 import { TRANSACTION_VERSION } from '../config';
+import { USDC_MINT } from '../config';
 import { env } from './env';
 import type { CompanyDoc } from './models';
 import { decryptBytes, encryptBytes } from './secrets';
@@ -99,7 +109,8 @@ export async function airdropToVault(company: CompanyDoc): Promise<void> {
 export async function setupCompanyOnChain(company: CompanyDoc): Promise<void> {
   const { client, vault, keys, mint } = await companyChain(company);
 
-  if (!(await fetchMaybeMint(client.rpc, mint)).exists) {
+  const existing = await fetchMaybeMint(client.rpc, mint);
+  if (!existing.exists) {
     await createPayrollMint(client, {
       mint: await loadSigner(company.mint.seedEnc),
       authority: vault,
@@ -107,6 +118,23 @@ export async function setupCompanyOnChain(company: CompanyDoc): Promise<void> {
       approvePolicy: 'manual',
       auditorElgamalPubkey: company.auditorElgamalPubkey as Address,
     });
+  }
+  if (company.backing === 'usdc') {
+    // Hand minting to the Sealed Vault (only if not done yet), and open the USDC funding account.
+    const vaultPda = await findVaultCompanyAddress(mint);
+    const current = existing.exists ? existing.data.mintAuthority : null;
+    if (!(current && current.__option === 'Some' && current.value === vaultPda)) {
+      await registerVaultBackedMint(client, { companyMint: mint, mintAuthority: vault, admin: vault, usdcMint: USDC_MINT as Address });
+    }
+    await client.sendTransaction(
+      getCreateAssociatedTokenIdempotentInstruction({
+        payer: vault,
+        ata: await usdcFundingAddress(company),
+        owner: vault.address,
+        mint: USDC_MINT as Address,
+        tokenProgram: TOKEN_PROGRAM_ADDRESS,
+      }),
+    );
   }
   const treasury = await setupConfidentialAccount(client, { owner: vault, mint, keys });
   await approveConfidentialAccount(client, { mint, authority: vault, owner: vault.address });
@@ -116,7 +144,33 @@ export async function setupCompanyOnChain(company: CompanyDoc): Promise<void> {
   await company.save();
 }
 
+/** A token account's public balance; 0 if it doesn't exist yet. */
+async function tokenBalance(client: SealedClient, address: Address): Promise<bigint> {
+  const account = await fetchMaybeToken(client.rpc, address);
+  return account.exists ? account.data.amount : 0n;
+}
+
+/** Where a USDC-backed company receives USDC before it's wrapped into the treasury. */
+export async function usdcFundingAddress(company: CompanyDoc): Promise<Address> {
+  return usdcAccountAddress(company.vault.address as Address, USDC_MINT as Address);
+}
+
+let vaultDeployed: Promise<boolean> | null = null;
+
+/** Whether USDC backing is available here: the Sealed Vault program is deployed on this cluster. */
+export async function vaultAvailable(): Promise<boolean> {
+  vaultDeployed ??= createSealedClient({ rpcUrl: env.rpcUrl, feePayer: createNoopSigner(USDC_MINT as Address) })
+    .then(isVaultProgramDeployed)
+    .catch(() => {
+      vaultDeployed = null;
+      return false;
+    });
+  return vaultDeployed;
+}
+
 export type TreasuryBalances = {
+  /** USDC received at the funding address, not yet wrapped (USDC-backed companies). */
+  usdcWaiting?: bigint;
   /** Test tokens not yet moved into the confidential balance (public). */
   public: bigint;
   /** Available to pay out. Only the company can decrypt this. */
@@ -130,9 +184,33 @@ export async function treasuryBalances(company: CompanyDoc): Promise<TreasuryBal
   const token = await tokenAccountAddress(vault.address, mint);
   const account = await fetchMaybeToken(client.rpc, token);
   const sol = await vaultSol(company);
-  if (!account.exists || !confidentialState(account.data)) return { public: 0n, confidential: 0n, pending: 0n, sol };
+  const usdcWaiting = company.backing === 'usdc' ? await tokenBalance(client, await usdcFundingAddress(company)) : undefined;
+  if (!account.exists || !confidentialState(account.data)) return { usdcWaiting, public: 0n, confidential: 0n, pending: 0n, sol };
   const balance = await getConfidentialBalance(client, { owner: vault.address, mint, keys });
-  return { public: account.data.amount, confidential: balance.availableBalance, pending: balance.pendingBalance, sol };
+  return { usdcWaiting, public: account.data.amount, confidential: balance.availableBalance, pending: balance.pendingBalance, sol };
+}
+
+/**
+ * USDC-backed companies: wraps all the USDC waiting at the funding address into company tokens
+ * (1:1, through the Sealed Vault) and moves them into the confidential treasury.
+ */
+export async function wrapIntoTreasury(company: CompanyDoc): Promise<bigint> {
+  const { client, vault, keys, mint } = await companyChain(company);
+  const funding = await usdcFundingAddress(company);
+  const amount = await tokenBalance(client, funding);
+  if (amount === 0n) return 0n;
+  await client.sendTransaction(
+    await getWrapInstruction({
+      depositor: vault,
+      companyMint: mint,
+      usdcMint: USDC_MINT as Address,
+      depositorUsdc: funding,
+      recipientToken: await tokenAccountAddress(vault.address, mint),
+      amount,
+    }),
+  );
+  await depositToConfidential(client, { owner: vault, mint, keys, amount, decimals: company.decimals });
+  return amount;
 }
 
 /**

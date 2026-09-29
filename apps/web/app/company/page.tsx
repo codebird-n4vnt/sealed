@@ -18,6 +18,17 @@ function CreateCompany() {
   const [symbol, setSymbol] = useState(DEFAULT_TOKEN_SYMBOL);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // USDC backing is offered where the Sealed Vault program is deployed.
+  const [vault, setVault] = useState(false);
+  const [usdc, setUsdc] = useState(false);
+  useEffect(() => {
+    api<{ available: boolean }>('/api/vault')
+      .then(({ available }) => {
+        setVault(available);
+        setUsdc(available);
+      })
+      .catch(() => setVault(false));
+  }, []);
 
   return (
     <Card
@@ -33,7 +44,7 @@ function CreateCompany() {
           try {
             const auditor = generateAuditorKey();
             const { id } = await api<{ id: string }>('/api/companies', {
-              body: { name, symbol, auditorElgamalPubkey: auditor.elgamalPubkey },
+              body: { name, symbol, auditorElgamalPubkey: auditor.elgamalPubkey, backing: usdc ? 'usdc' : 'test' },
             });
             downloadAuditorKey({
               type: 'sealed-auditor-key',
@@ -58,6 +69,18 @@ function CreateCompany() {
             <Input value={symbol} onChange={e => setSymbol(e.target.value)} required pattern="[A-Za-z0-9]{2,10}" />
           </Field>
         </div>
+        {vault && (
+          <label className="flex items-start gap-3 rounded-lg border border-line bg-surface-2 p-3 text-sm">
+            <input type="checkbox" className="mt-1" checked={usdc} onChange={e => setUsdc(e.target.checked)} />
+            <span>
+              <span className="font-medium">Back the payroll token 1:1 with USDC</span>
+              <span className="block text-muted">
+                Fund payroll by sending USDC; the Sealed Vault program wraps it into your confidential token, and
+                employees can cash out to USDC. Otherwise the company uses a test token.
+              </span>
+            </span>
+          </label>
+        )}
         <p className="text-sm text-muted">
           Your browser also creates the <strong className="font-medium text-ink">auditor key</strong> and downloads it as
           a file. Give it to your accountant: it lets them read every payment amount. Sealed never sees it.

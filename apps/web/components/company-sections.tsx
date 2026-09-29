@@ -7,6 +7,7 @@ import { useState } from 'react';
 
 import { api, errorMessage, toBase64 } from '@/lib/client/api';
 import { useSignText } from '@/lib/client/wallet';
+import { parseTeamCsv, TEAM_CSV_TEMPLATE, type TeamRow } from '@/lib/team-csv';
 
 import {
   AddressLink,
@@ -277,7 +278,86 @@ export function TeamCard({ data, reload }: { data: CompanyData; reload: () => vo
         </Button>
       </form>
       <ErrorText error={add.error} />
+      <TeamImport company={company} reload={reload} />
     </Card>
+  );
+}
+
+const TEMPLATE_HREF = `data:text/csv;charset=utf-8,${encodeURIComponent(TEAM_CSV_TEMPLATE)}`;
+
+/** Adds a whole team from a CSV file, after a preview. All or nothing. */
+function TeamImport({ company, reload }: { company: CompanyData['company']; reload: () => void }) {
+  const [file, setFile] = useState<{ name: string; rows: TeamRow[]; errors: string[] } | null>(null);
+  const importing = useAction(() => {
+    setFile(null);
+    reload();
+  });
+
+  if (!file) {
+    return (
+      <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-5 text-sm">
+        <label className="inline-flex h-10 cursor-pointer items-center rounded-lg border border-line bg-surface px-4 font-medium hover:bg-surface-2">
+          Import from CSV
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            className="sr-only"
+            onChange={async event => {
+              const chosen = event.target.files?.[0];
+              event.target.value = '';
+              if (chosen) setFile({ name: chosen.name, ...parseTeamCsv(await chosen.text()) });
+            }}
+          />
+        </label>
+        <span className="text-muted">
+          Columns: name, salary, and optionally wallet and email.{' '}
+          <a className="underline" href={TEMPLATE_HREF} download="sealed-team-template.csv">
+            Download a template
+          </a>
+        </span>
+      </div>
+    );
+  }
+
+  const shown = file.rows.slice(0, 5);
+  return (
+    <div className="mt-5 grid gap-3 border-t border-line pt-5 text-sm">
+      <p>
+        <span className="font-medium">{file.name}</span>: {file.rows.length} {file.rows.length === 1 ? 'person' : 'people'}
+      </p>
+      {shown.length > 0 && (
+        <ul className="grid gap-1 text-muted">
+          {shown.map(row => (
+            <li key={row.line}>
+              {row.name}, {row.salary} {company.symbol}
+              {row.wallet ? `, ${row.wallet.slice(0, 4)}…${row.wallet.slice(-4)}` : ''}
+            </li>
+          ))}
+          {file.rows.length > shown.length && <li>and {file.rows.length - shown.length} more</li>}
+        </ul>
+      )}
+      {file.errors.length > 0 && (
+        <Notice tone="warn">
+          Fix these and choose the file again: {file.errors.slice(0, 5).join(' ')}
+          {file.errors.length > 5 ? ` (and ${file.errors.length - 5} more)` : ''}
+        </Notice>
+      )}
+      <div className="flex gap-3">
+        <Button
+          disabled={file.errors.length > 0 || file.rows.length === 0}
+          loading={importing.busy}
+          onClick={() =>
+            importing.run(() => api(`/api/companies/${company.id}/members/import`, { body: { rows: file.rows } }))
+          }
+        >
+          Add {file.rows.length} {file.rows.length === 1 ? 'person' : 'people'}
+        </Button>
+        <Button variant="ghost" onClick={() => setFile(null)} disabled={importing.busy}>
+          Cancel
+        </Button>
+      </div>
+      <ErrorText error={importing.error} />
+    </div>
   );
 }
 

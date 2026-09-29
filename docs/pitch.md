@@ -24,10 +24,13 @@ employer, the employee and the company's accountant can see how much anyone earn
    2026 after audits. Official TypeScript support now makes a browser app realistic. And almost
    nobody has built a product on it: wallets barely support it, and there's no business product.
    Sealed is the first.
-4. **What we built.** A working product on a mainnet fork and devnet: the company dashboard with
-   one-click approved payroll runs, the employee portal where people join with zero SOL, and the
-   accountant view with CSV export. It includes a fee sponsor that checks every transaction it
-   pays for, and a payroll engine that can't pay anyone twice.
+4. **What we built.** A working product on devnet: the company dashboard with one-click approved
+   payroll runs, the employee portal where people join with zero SOL, and the accountant view with
+   CSV export. With the new v1 transaction format, each payment is one transaction: a 10-person run
+   takes about 25 seconds. It includes a fee sponsor that checks every transaction it pays for, a
+   payroll engine that can't pay anyone twice (tested against a simulated chain where transactions
+   land late or never), and the Sealed Vault program for USDC backing. The Confidential Balances
+   code is a reusable open-source toolkit (`packages/core`).
 5. **Traction.** **[N]** teams contacted, **[N]** devnet pilots or letters of intent. Quote:
    **["…" — Name, Role, Company]**.
 6. **What's next.** The Sealed Vault (USDC in, confidential payroll, USDC out), an audit, mainnet,

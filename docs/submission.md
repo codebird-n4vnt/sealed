@@ -36,7 +36,9 @@ tax and audit, with CSV export. Everyone else sees that a payment happened, but 
 What's built: the core library (key derivation, confidential transfers, recipient and auditor
 decryption, a fee-sponsorship policy with tests), a company dashboard with resumable payroll runs
 that never pay anyone twice, the employee portal, and the accountant view. It all works end to end
-on devnet. A Sealed Vault program backs each company token 1:1 with USDC (tested on a mainnet fork).
+on devnet, with one transaction per payment: a 10-person payroll run takes about 25 seconds. A Sealed
+Vault program backs each company token 1:1 with USDC (tested on a mainnet fork). The Confidential
+Balances code is a reusable toolkit (`packages/core`).
 
 ## Links
 

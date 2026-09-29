@@ -21,6 +21,7 @@
     "@wallet-standard/base": "1.1.1",
     "@wallet-standard/features": "1.1.1",
     "@wallet-standard/react": "1.0.3",
+    "@wallet-standard/ui": "1.0.3",
     "@wallet-standard/wallet": "1.1.1",
     "mongoose": "9.10.2",
     "next": "16.3.6",

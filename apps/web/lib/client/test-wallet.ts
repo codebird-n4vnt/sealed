@@ -90,7 +90,7 @@ class SealedTestWallet implements Wallet {
       [SolanaSignMessage]: { version: '1.0.0', signMessage: this.#signMessage },
       [SolanaSignTransaction]: {
         version: '1.0.0',
-        supportedTransactionVersions: ['legacy', 0],
+        supportedTransactionVersions: ['legacy', 0, 1],
         signTransaction: this.#signTransaction,
       },
     };

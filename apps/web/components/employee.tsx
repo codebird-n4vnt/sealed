@@ -19,10 +19,9 @@ import {
 } from '@sealed/core';
 
 import { api, errorMessage } from '@/lib/client/api';
-import { createEmployeeClient, readOnlyClient, useConfidentialKeys } from '@/lib/client/confidential';
+import { createEmployeeClient, employeeTransactionVersion, readOnlyClient, useConfidentialKeys } from '@/lib/client/confidential';
 import { transactionCache } from '@/lib/client/transaction-cache';
 import { useTransactionSigner } from '@/lib/client/wallet';
-import { TRANSACTION_VERSION } from '@/lib/config';
 
 import { AddressLink, Amount, Badge, Button, Card, ErrorText, Field, Input, LockIcon, Notice, Sealed, Stat, displayAmount, formatBlockTime } from './ui';
 
@@ -54,7 +53,11 @@ export function SetupAccount({ account, membership, onReady }: { account: UiWall
       setStep('Sign once to create your private keys');
       const keys = await unlock();
       setStep('Approve the setup transaction (your company pays the fee)');
-      const client = await createEmployeeClient({ memberId: membership.memberId, vault: membership.company.vault });
+      const client = await createEmployeeClient({
+        memberId: membership.memberId,
+        vault: membership.company.vault,
+        transactionVersion: employeeTransactionVersion(account),
+      });
       await setupConfidentialAccount(client, { owner, mint: membership.company.mint as Address, keys });
       setStep(`Waiting for ${membership.company.name} to approve your account`);
       await api(`/api/memberships/${membership.memberId}/ready`, { method: 'POST' });
@@ -210,6 +213,7 @@ export function MembershipCard({ account, membership, onChange }: { account: UiW
   const [actionError, setActionError] = useState<string | null>(null);
   const { company } = membership;
   const mint = company.mint as Address;
+  const version = employeeTransactionVersion(account);
 
   const act = async (kind: 'collect' | 'withdraw', action: () => Promise<unknown>) => {
     setBusy(kind);
@@ -266,7 +270,7 @@ export function MembershipCard({ account, membership, onChange }: { account: UiW
               disabled={!balances.pending}
               loading={busy === 'collect'}
               onClick={() => act('collect', async () => {
-                const client = await createEmployeeClient({ memberId: membership.memberId, vault: company.vault });
+                const client = await createEmployeeClient({ memberId: membership.memberId, vault: company.vault, transactionVersion: version });
                 await applyPendingBalance(client, { owner, mint, keys });
               })}
             >
@@ -282,14 +286,14 @@ export function MembershipCard({ account, membership, onChange }: { account: UiW
                 const amount = parseAmount(withdrawAmount, company.decimals);
                 if (amount <= 0n) throw new Error('Enter an amount to withdraw.');
                 if (balances.available !== null && amount > balances.available) throw new Error('That is more than your private balance.');
-                const client = await createEmployeeClient({ memberId: membership.memberId, vault: company.vault });
+                const client = await createEmployeeClient({ memberId: membership.memberId, vault: company.vault, transactionVersion: version });
                 await withdrawConfidential(client, {
                   owner,
                   mint,
                   keys,
                   amount,
                   decimals: company.decimals,
-                  proofDelivery: TRANSACTION_VERSION === 1 ? 'one-transaction' : 'inline',
+                  proofDelivery: version === 1 ? 'one-transaction' : 'inline',
                 });
               });
             }}

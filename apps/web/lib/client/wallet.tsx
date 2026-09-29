@@ -7,7 +7,9 @@ import {
   useWalletAccountTransactionSigner,
 } from '@solana/react';
 import type { Address, MessagePartialSigner, SignatureBytes } from '@solana/kit';
+import { SolanaSignTransaction, type SolanaSignTransactionFeature } from '@solana/wallet-standard-features';
 import type { UiWallet, UiWalletAccount } from '@wallet-standard/react';
+import { getWalletAccountFeature } from '@wallet-standard/ui';
 import { useEffect, useMemo, type ReactNode } from 'react';
 
 import { TEST_WALLET_ENABLED, WALLET_CHAIN } from '../config';
@@ -95,6 +97,16 @@ export function useMessageSigner(account: UiWalletAccount): MessagePartialSigner
 }
 
 /** The wallet as a transaction signer for the Sealed network. */
+/** Whether the account's wallet declares it can sign v1 transactions. */
+export function supportsV1Transactions(account: UiWalletAccount): boolean {
+  try {
+    const feature = getWalletAccountFeature(account, SolanaSignTransaction) as SolanaSignTransactionFeature[typeof SolanaSignTransaction];
+    return feature.supportedTransactionVersions.includes(1);
+  } catch {
+    return false;
+  }
+}
+
 export function useTransactionSigner(account: UiWalletAccount) {
   return useWalletAccountTransactionSigner(account, WALLET_CHAIN);
 }

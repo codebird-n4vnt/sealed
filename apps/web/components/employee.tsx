@@ -9,6 +9,7 @@ import {
   applyPendingBalance,
   confidentialState,
   fetchReceivedPayments,
+  formatAmount,
   getConfidentialBalance,
   parseAmount,
   setupConfidentialAccount,
@@ -160,6 +161,24 @@ function History({ account, membership }: { account: UiWalletAccount; membership
   if (error) return <ErrorText error={error} />;
   if (!payments) return <p className="text-sm text-muted">Decrypting your payments…</p>;
   if (payments.length === 0) return <p className="text-sm text-muted">No payments yet.</p>;
+
+  // Built here from the amounts decrypted in this browser; nothing is sent anywhere.
+  const download = () => {
+    const lines = ['date_utc,company,amount,symbol,signature'];
+    for (const payment of payments) {
+      const date = Number(payment.blockTime ?? 0) > 1_600_000_000 ? new Date(Number(payment.blockTime) * 1000).toISOString() : '';
+      const amount = payment.amount === null ? '' : formatAmount(payment.amount, decimals);
+      const company = /[",\n]/.test(membership.company.name) ? `"${membership.company.name.replace(/"/g, '""')}"` : membership.company.name;
+      lines.push([date, company, amount, symbol, payment.signature].join(','));
+    }
+    const url = URL.createObjectURL(new Blob([lines.join('\n') + '\n'], { type: 'text/csv' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${membership.company.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-my-pay.csv`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  };
+
   return (
     <div className="grid divide-y divide-line">
       {payments.map(payment => (
@@ -173,6 +192,11 @@ function History({ account, membership }: { account: UiWalletAccount; membership
           <AddressLink address={payment.signature} kind="tx" />
         </div>
       ))}
+      <div className="pt-3">
+        <Button variant="ghost" onClick={download}>
+          Download as CSV
+        </Button>
+      </div>
     </div>
   );
 }

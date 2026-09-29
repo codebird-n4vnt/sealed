@@ -5,6 +5,9 @@ import { resumeIfStale } from '@/lib/server/payroll';
 import { decryptAmount } from '@/lib/server/secrets';
 import { requireWallet } from '@/lib/server/session';
 
+// The payroll worker may run after the response (see ensureRunWorker).
+export const maxDuration = 300;
+
 /** A run's progress, one row per payment. Admin only. Resumes the run if its worker died. */
 export const GET = route<{ runId: string }>(async (_, { params }) => {
   const { run, company } = await loadRunAsAdmin((await params).runId, await requireWallet());

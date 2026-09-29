@@ -6,6 +6,9 @@ import { decryptAmount } from '@/lib/server/secrets';
 import { requireWallet, verifyWalletSignature } from '@/lib/server/session';
 import { treasuryBalances } from '@/lib/server/solana';
 
+// The payroll worker may run after the response (see ensureRunWorker).
+export const maxDuration = 300;
+
 /** The admin approves a drafted run by signing its approval message; then payroll starts. */
 export const POST = route<{ runId: string }>(async (request, { params }) => {
   const wallet = await requireWallet();

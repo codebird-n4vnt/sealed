@@ -190,6 +190,14 @@ describe('settlePayment', () => {
     expect(w.debits).toBe(0);
   });
 
+  it('stops before sending anything once another worker has taken the run over', async () => {
+    const w = world({ attempts: [{ kind: 'ok' }] });
+    const lost = { ...w.deps, beat: async () => { throw new Error('Another worker took over this payroll run.'); } };
+    await expect(settlePayment(fresh(), lost)).rejects.toThrow(/took over/);
+    expect(w.retriesAt).toHaveLength(0);
+    expect(w.debits).toBe(0);
+  });
+
   it('refuses when the treasury is short, or the employee is not set up', async () => {
     const short = world({ treasury: 100n, attempts: [] });
     const a = fresh();

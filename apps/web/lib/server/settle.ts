@@ -38,7 +38,10 @@ export type SettleDeps = {
   /** The finalized block height. */
   blockHeight(): Promise<bigint>;
   save(state: PaymentState): Promise<void>;
-  /** Keeps the run's heartbeat fresh, so no second worker picks it up during a wait. */
+  /**
+   * Keeps the run's heartbeat fresh, so no second worker picks it up during a wait. Throws if
+   * another worker has taken the run over; it's called right before every payment is sent.
+   */
   beat(): Promise<unknown>;
   now(): number;
   sleep(ms: number): Promise<void>;
@@ -132,6 +135,7 @@ export async function settlePayment(state: PaymentState, deps: SettleDeps): Prom
   state.submittedAt = undefined;
   state.attempts += 1;
   await deps.save(state);
+  await deps.beat(); // throws if this worker no longer holds the run
 
   try {
     const signature = await deps.pay(async () => {

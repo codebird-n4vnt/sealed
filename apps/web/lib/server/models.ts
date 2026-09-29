@@ -66,6 +66,8 @@ const payrollRunSchema = new Schema(
     startedAt: Date,
     finishedAt: Date,
     heartbeatAt: Date,
+    /** The worker that holds the run; only it may pay. Another may take over once the heartbeat is stale. */
+    workerId: String,
   },
   { timestamps: true },
 );

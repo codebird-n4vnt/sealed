@@ -1,6 +1,9 @@
 import 'server-only';
 
+import { randomUUID } from 'node:crypto';
+
 import type { Address, Signature } from '@solana/kit';
+import { after } from 'next/server';
 
 import {
   fetchConfidentialTransfers,
@@ -80,13 +83,22 @@ export async function processRun(runId: string): Promise<void> {
   }
 }
 
-/** Starts (or resumes) the worker for a running payroll run, if one isn't already active. */
+/**
+ * Starts (or resumes) the worker for a running payroll run, if one isn't already active here.
+ * Called while handling a request: `after` keeps a serverless function alive until the worker
+ * finishes (up to the route's maxDuration); a longer run is resumed by the next progress poll.
+ */
 export function ensureRunWorker(runId: string): void {
   if (activeRuns.has(runId)) return;
   activeRuns.add(runId);
-  void work(runId)
+  const job = work(runId)
     .catch(error => console.error(`Payroll run ${runId} stopped:`, error))
     .finally(() => activeRuns.delete(runId));
+  try {
+    after(job);
+  } catch {
+    // Outside a request (a script): the promise simply runs to completion.
+  }
 }
 
 /** Resumes a run whose worker died (e.g. a server restart). */
@@ -102,15 +114,39 @@ async function treasuryAvailable(chain: CompanyChain): Promise<bigint> {
   return balance.availableBalance;
 }
 
+/**
+ * Claims a running run for this worker: only if no worker holds it, it's ours already, or its
+ * worker went quiet. Atomic, so across server instances at most one worker pays at a time.
+ */
+function claimRun(runId: string, workerId: string) {
+  const stale = new Date(Date.now() - HEARTBEAT_STALE_MS);
+  return PayrollRun.findOneAndUpdate(
+    {
+      _id: runId,
+      status: 'running',
+      $or: [{ workerId: { $in: [null, workerId] } }, { heartbeatAt: { $lt: stale } }, { heartbeatAt: null }],
+    },
+    { workerId, heartbeatAt: new Date() },
+    { new: true },
+  );
+}
+
 async function work(runId: string): Promise<void> {
-  const run = await PayrollRun.findById(runId);
-  if (!run || run.status !== 'running') return;
+  const workerId = randomUUID();
+  const run = await claimRun(runId, workerId);
+  if (!run) return;
   const company = await Company.findById(run.companyId);
   if (!company) throw new Error('Company not found.');
   const chain = await companyChain(company);
 
+  // Refreshes the heartbeat, and stops this worker if another took the run over (e.g. this
+  // instance was frozen long enough to look dead). Called before every payment is sent.
+  const beat = async () => {
+    const { matchedCount } = await PayrollRun.updateOne({ _id: run._id, workerId }, { heartbeatAt: new Date() });
+    if (matchedCount === 0) throw new Error('Another worker took over this payroll run.');
+  };
+
   const payments = await Payment.find({ runId: run._id }).sort({ _id: 1 });
-  const beat = () => PayrollRun.updateOne({ _id: run._id }, { heartbeatAt: new Date() });
   for (const payment of payments) {
     if (payment.status === 'confirmed' || payment.status === 'failed') continue;
     await beat();
@@ -119,9 +155,13 @@ async function work(runId: string): Promise<void> {
 
   const statuses = (await Payment.find({ runId: run._id }, { status: 1 })).map(p => p.status);
   const confirmed = statuses.filter(s => s === 'confirmed').length;
-  run.status = confirmed === statuses.length ? 'completed' : confirmed === 0 ? 'failed' : 'partial';
-  run.finishedAt = new Date();
-  await run.save();
+  await PayrollRun.updateOne(
+    { _id: run._id, workerId },
+    {
+      status: confirmed === statuses.length ? 'completed' : confirmed === 0 ? 'failed' : 'partial',
+      finishedAt: new Date(),
+    },
+  );
 }
 
 /**

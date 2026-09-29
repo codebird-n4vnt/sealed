@@ -3,6 +3,7 @@ import { isValidObjectId } from 'mongoose';
 import { parseAmount } from '@sealed/core';
 
 import { loadCompanyAsAdmin } from '@/lib/server/access';
+import { assertEditable } from '@/lib/server/demo';
 import { badRequest, json, notFound, readJson, route } from '@/lib/server/http';
 import { Member } from '@/lib/server/models';
 import { encryptAmount } from '@/lib/server/secrets';
@@ -13,6 +14,7 @@ type Params = { companyId: string; memberId: string };
 async function loadMember(params: Promise<Params>) {
   const { companyId, memberId } = await params;
   const company = await loadCompanyAsAdmin(companyId, await requireWallet());
+  assertEditable(company);
   const member = isValidObjectId(memberId) ? await Member.findOne({ _id: memberId, companyId: company._id }) : null;
   if (!member) throw notFound('Team member not found.');
   return { company, member };

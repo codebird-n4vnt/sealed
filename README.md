@@ -187,7 +187,14 @@ MONGODB_URI=<atlas uri> DATA_ENCRYPTION_KEY=<same key> NEXT_PUBLIC_SOLANA_CLUSTE
 ```
 
 The built-in test wallet stays on (set `NEXT_PUBLIC_ENABLE_TEST_WALLET=false` to hide it), so
-judges can try every role without installing a wallet.
+visitors can try every role without installing a wallet.
+
+**The one-click public demo (optional).** Set `DEMO_KIT` on the server to the contents of
+`.keys/demo-devnet/demo-kit.json` (the seed writes it). The landing page then offers "Explore the
+live demo" as the admin, an employee or the accountant: each loads that role's identity into the
+test wallet and opens its page, and the accountant's key loads by itself. These demo keys become
+public, so use them only for a devnet demo company. The demo company's team can't be edited, and
+it can run payroll at most once a minute.
 
 ## Tests
 

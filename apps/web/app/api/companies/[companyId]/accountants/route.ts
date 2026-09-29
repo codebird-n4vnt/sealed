@@ -1,6 +1,7 @@
 import { isAddress } from '@solana/kit';
 
 import { loadCompanyAsAdmin } from '@/lib/server/access';
+import { assertEditable } from '@/lib/server/demo';
 import { badRequest, json, readJson, route } from '@/lib/server/http';
 import { requireWallet } from '@/lib/server/session';
 
@@ -8,6 +9,7 @@ type Params = { companyId: string };
 
 async function change(request: Request, params: Promise<Params>, operation: '$addToSet' | '$pull') {
   const company = await loadCompanyAsAdmin((await params).companyId, await requireWallet());
+  assertEditable(company);
   const { wallet } = await readJson<{ wallet?: string }>(request);
   if (!wallet || !isAddress(wallet.trim())) throw badRequest('That is not a Solana address.');
   await company.updateOne({ [operation]: { accountantWallets: wallet.trim() } });

@@ -47,7 +47,8 @@ Balances code is a reusable toolkit (`packages/core`).
 - Product demo video, at most 3 minutes: **[link]**
 - Deck: **[link]** (a draft deck was made alongside the code; share it before linking)
 - Logo: `docs/logo.png` (512 × 512) or `docs/logo.svg`
-- Live devnet demo: **[URL, once deployed]**
+- Live devnet demo: **[URL, once deployed]** (with `DEMO_KIT` set, visitors can explore as the
+  admin, an employee or the accountant in one click)
 - Colosseum project: **[link]**
 - Colosseum profile: **[link]**
 - X: **[optional]**

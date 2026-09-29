@@ -11,6 +11,7 @@ import { AddressLink, Amount, Button, Card, EmptyState, ErrorText, Notice, PageH
 import { api, errorMessage } from '@/lib/client/api';
 import { parseAuditorKey } from '@/lib/client/auditor-key';
 import { readOnlyClient } from '@/lib/client/confidential';
+import { DEMO_AUDITOR_KEY_STORAGE } from '@/lib/client/demo';
 import { transactionCache } from '@/lib/client/transaction-cache';
 
 type AuditCompany = {
@@ -77,6 +78,32 @@ function CompanyAudit({ company }: { company: AuditCompany }) {
     return () => controller.abort();
   }, [company.treasuryAccount]);
 
+  // The public demo leaves its auditor key here; a real accountant loads their own file.
+  const [demoKey, setDemoKey] = useState(false);
+  useEffect(() => {
+    if (!transfers || secret) return;
+    try {
+      const stored = sessionStorage.getItem(DEMO_AUDITOR_KEY_STORAGE);
+      const parsed = stored ? parseAuditorKey(stored) : null;
+      if (parsed && parsed.file.elgamalPubkey === company.auditorElgamalPubkey) {
+        setSecret(parsed.secret);
+        setDemoKey(true);
+      }
+    } catch {
+      // No usable demo key: the accountant loads one by hand.
+    }
+  }, [transfers, secret, company.auditorElgamalPubkey]);
+
+  const lock = () => {
+    setSecret(null);
+    setDemoKey(false);
+    try {
+      sessionStorage.removeItem(DEMO_AUDITOR_KEY_STORAGE);
+    } catch {
+      // Nothing stored.
+    }
+  };
+
   const rows: Row[] = useMemo(() => {
     const directory = new Map(company.directory.map(d => [d.tokenAccount, d]));
     return (transfers ?? []).map(transfer => {
@@ -121,10 +148,14 @@ function CompanyAudit({ company }: { company: AuditCompany }) {
       <Card
         title="Auditor key"
         description="Decrypts every payment amount in your browser. The key file never leaves this device."
-        actions={secret && <Button variant="ghost" onClick={() => setSecret(null)}>Lock</Button>}
+        actions={secret && <Button variant="ghost" onClick={lock}>Lock</Button>}
       >
         {secret ? (
-          <Notice tone="ok">Key loaded. Amounts below are decrypted locally.</Notice>
+          <Notice tone="ok">
+            {demoKey
+              ? "Demo: Acme DAO's auditor key was loaded for you. A real accountant keeps this file themselves; amounts below are decrypted in this browser."
+              : 'Key loaded. Amounts below are decrypted locally.'}
+          </Notice>
         ) : (
           <label className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm hover:border-ink">
             <span className="font-medium">Choose the auditor key file</span>

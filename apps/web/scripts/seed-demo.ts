@@ -126,22 +126,16 @@ async function main() {
     mint: await generateStoredKeypair(),
   });
   const auditorFile = join(KEYS, `auditor-key-${slug(args.name)}.json`);
-  writeFileSync(
-    auditorFile,
-    JSON.stringify(
-      {
-        type: 'sealed-auditor-key',
-        version: 1,
-        company: { id: company.id, name: company.name },
-        elgamalPubkey: auditorPubkey,
-        secretKey: Buffer.from(auditor.secret().toBytes()).toString('base64'),
-        createdAt: new Date().toISOString(),
-      },
-      null,
-      2,
-    ),
-    { mode: 0o600 },
-  );
+  const auditorKey = {
+    type: 'sealed-auditor-key',
+    version: 1,
+    company: { id: company.id, name: company.name },
+    elgamalPubkey: auditorPubkey,
+    secretKey: Buffer.from(auditor.secret().toBytes()).toString('base64'),
+    createdAt: new Date().toISOString(),
+  };
+  writeFileSync(auditorFile, JSON.stringify(auditorKey, null, 2), { mode: 0o600 });
+  let demoEmployee: { label: string; seed: string } | undefined;
 
   log(`Funding the payroll vault ${company.vault.address} with test SOL`);
   if (args['fund-from']) {
@@ -190,7 +184,8 @@ async function main() {
     }
 
     log(`Onboarding ${name}`);
-    const { signer: employee } = await newWallet(join(KEYS, 'team', `${slug(name)}.json`));
+    const { signer: employee, seed: employeeSeed } = await newWallet(join(KEYS, 'team', `${slug(name)}.json`));
+    demoEmployee ??= { label: `${name} (employee)`, seed: Buffer.from(employeeSeed).toString('base64') };
     const keys = await deriveKeys(employee);
     const token = await tokenAccountAddress(employee.address, mint);
     // Exactly the browser's path: the company sponsors fees, after the sponsor policy approves.
@@ -238,6 +233,21 @@ async function main() {
   if (identities.length > 0) {
     writeFileSync(join(KEYS, 'test-wallet-identities.json'), JSON.stringify({ identities }, null, 2), { mode: 0o600 });
   }
+  // The public demo's kit (the DEMO_KIT server variable): these keys become public on purpose.
+  const demoKitFile = join(KEYS, 'demo-kit.json');
+  if (admin && accountant && demoEmployee) {
+    const identity = (label: string, seed: Uint8Array) => ({ label, seed: Buffer.from(seed).toString('base64') });
+    const kit = {
+      companyId: company.id,
+      identities: {
+        admin: identity(`${company.name} admin`, admin.seed),
+        employee: demoEmployee,
+        accountant: identity(`${company.name} accountant`, accountant.seed),
+      },
+      auditorKey,
+    };
+    writeFileSync(demoKitFile, JSON.stringify(kit), { mode: 0o600 });
+  }
 
   console.log(`
 \x1b[1;32mSeeded ${company.name}.\x1b[0m
@@ -246,7 +256,7 @@ async function main() {
   Accountant:       ${accountantWallet}
   Auditor key file: ${auditorFile}
   Live onboarding:  ${invites.join('\n                    ')}
-${identities.length > 0 ? `  Test wallet:      import ${join(KEYS, 'test-wallet-identities.json')} from the wallet menu\n` : ''}`);
+${identities.length > 0 ? `  Test wallet:      import ${join(KEYS, 'test-wallet-identities.json')} from the wallet menu\n` : ''}${admin && accountant ? `  Public demo:      set DEMO_KIT on the server to the contents of ${demoKitFile}\n` : ''}`);
 }
 
 main()

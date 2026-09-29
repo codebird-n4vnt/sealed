@@ -692,6 +692,9 @@ Sealed doesn't use Panta.
 - **Keypairs live in `.keys/`** (gitignored). Never commit keypairs, `.env`, signatures or derived keys.
 - Never send an employee's derivation signature, ElGamal secret or AES key to the backend, and never log them.
 - The auditor secret key is loaded **locally in the accountant's browser** and never uploaded.
+  - One deliberate, opt-in exception (Sep 29): the public devnet demo (`DEMO_KIT`) publishes one
+    seeded test company's keys, so visitors can explore each role. They control nothing but that
+    test company; its team is locked and its runs are spaced out. Real companies are unaffected.
 - Never log salary amounts in plaintext on the server; store them encrypted at rest.
 - A payroll retry must check on-chain state first, so nobody is ever double-paid.
 - Confirm on-chain success before marking any payment "confirmed".

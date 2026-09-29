@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+import { DemoEntry } from '@/components/demo-entry';
+
 const ROLES = [
   {
     href: '/company',
@@ -42,6 +44,8 @@ export default function Home() {
           zero-knowledge proofs.
         </p>
       </section>
+
+      <DemoEntry />
 
       <section className="grid gap-4 md:grid-cols-3">
         {ROLES.map(role => (

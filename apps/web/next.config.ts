@@ -11,6 +11,22 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: join(import.meta.dirname, '..', '..'),
   // NEXT_OUTPUT=standalone builds a self-contained server (.next/standalone) for containers.
   ...(process.env.NEXT_OUTPUT === 'standalone' ? { output: 'standalone' as const } : {}),
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          // No framing: a hidden frame could trick an admin into clicking "Approve and pay".
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          // Invite links carry a token in the path; other sites only ever see the origin.
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

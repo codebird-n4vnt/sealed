@@ -67,7 +67,7 @@ Recorded on devnet with the seeded demo company. Amounts appear only for the peo
 
 | Path | What it is |
 |---|---|
-| [`packages/core`](packages/core) | All the Confidential Balances logic: keys, account setup, deposit, pay, collect, withdraw, balance and history decryption, auditor decryption, the sponsor policy. Unit and integration tests. |
+| [`packages/core`](packages/core) | All the Confidential Balances logic, as a reusable toolkit ([its README](packages/core/README.md)): keys, account setup, deposit, one-transaction payments, collect, withdraw, balance and history decryption, auditor decryption, the sponsor policy. Unit and integration tests. |
 | [`apps/web`](apps/web) | Next.js app: company dashboard, employee portal, accountant view, API, payroll engine, fee sponsor. |
 | [`programs/sealed-vault`](programs/sealed-vault) | Anchor program that backs each company token 1:1 with USDC (`init_company`, `wrap`, `unwrap`). |
 | [`scripts/day1-confidential-transfer.sh`](scripts/day1-confidential-transfer.sh) | The day-1 go/no-go test with the `spl-token` CLI. |

@@ -61,7 +61,8 @@ on devnet. A Sealed Vault program backs each company token 1:1 with USDC (tested
 - [ ] The portal also asks for teammates' backgrounds, location, chains and tools, go-to-market,
       demand validation and distribution. Use `docs/pitch.md` and `docs/traction.md`.
 - [ ] Deck exported (see `docs/pitch.md`).
-- [ ] Live devnet demo deployed and seeded.
+- [ ] Live devnet demo deployed and seeded (README, "Deploy a live demo": a tested Dockerfile, plus
+      the seeding command for a hosted database).
 - [ ] Traction section filled with real numbers (`docs/traction.md`).
 - [ ] Colosseum submission confirmed.
 - [ ] Superteam Earn submission (India track) with the GitHub, Colosseum project and profile links.

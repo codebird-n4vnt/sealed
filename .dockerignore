@@ -1,0 +1,18 @@
+# Secrets never go into an image.
+.keys/
+*.keypair.json
+.env
+.env.*
+!.env.example
+
+# Rebuilt inside the image, or not needed by the web app.
+**/node_modules/
+**/.next/
+target/
+programs/
+.anchor/
+.surfpool/
+test-ledger/
+.git/
+.claude/
+docs/

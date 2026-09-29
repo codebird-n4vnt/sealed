@@ -17,7 +17,7 @@ export const env = {
     return required('DATA_ENCRYPTION_KEY');
   },
   /** The server's RPC; defaults to the public one. */
-  rpcUrl: process.env.RPC_URL ?? PUBLIC_RPC_URL,
+  rpcUrl: process.env.RPC_URL || PUBLIC_RPC_URL,
   rpcSubscriptionsUrl: process.env.RPC_SUBSCRIPTIONS_URL || PUBLIC_RPC_SUBSCRIPTIONS_URL,
   cluster: CLUSTER,
 };

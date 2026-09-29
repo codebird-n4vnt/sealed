@@ -5,7 +5,7 @@ export type Cluster = 'devnet' | 'localnet';
 export const CLUSTER: Cluster = process.env.NEXT_PUBLIC_SOLANA_CLUSTER === 'devnet' ? 'devnet' : 'localnet';
 
 export const PUBLIC_RPC_URL =
-  process.env.NEXT_PUBLIC_RPC_URL ?? (CLUSTER === 'devnet' ? 'https://api.devnet.solana.com' : 'http://127.0.0.1:8899');
+  process.env.NEXT_PUBLIC_RPC_URL || (CLUSTER === 'devnet' ? 'https://api.devnet.solana.com' : 'http://127.0.0.1:8899');
 
 /** Websocket endpoint for confirmations; by default derived from the RPC URL. */
 export const PUBLIC_RPC_SUBSCRIPTIONS_URL = process.env.NEXT_PUBLIC_RPC_SUBSCRIPTIONS_URL || undefined;

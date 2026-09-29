@@ -149,6 +149,46 @@ Priya's invite link. It also writes these files to `.keys/demo/`, or `.keys/demo
 To use your own wallets instead: `pnpm seed --admin <ADDRESS> --accountant <ADDRESS>`. This
 skips last month's run, because it needs the admin's signature.
 
+## Deploy a live demo
+
+You need a MongoDB database (MongoDB Atlas's free tier works) and a host. The container path is
+the tested one: the image built from this repo's `Dockerfile` ran a 10-person payroll on devnet in
+24 seconds.
+
+**On a container host (Railway, Render, Fly.io, or any VM):** build from the `Dockerfile`, with
+these build arguments (they're compiled into the browser code):
+
+- `NEXT_PUBLIC_SOLANA_CLUSTER=devnet`
+- `NEXT_PUBLIC_RPC_URL`: a private devnet RPC if you have one (the default is the public one)
+
+and these runtime variables:
+
+- `MONGODB_URI`
+- `DATA_ENCRYPTION_KEY`: 32 random bytes, base64 (see above)
+- `RPC_URL` (optional): the server's own RPC, e.g. a private one
+
+```bash
+docker build -t sealed-web --build-arg NEXT_PUBLIC_SOLANA_CLUSTER=devnet .
+docker run -p 3000:3000 -e MONGODB_URI=... -e DATA_ENCRYPTION_KEY=... sealed-web
+```
+
+**On Vercel:** set the root directory to `apps/web` and the same variables. Payroll runs keep
+working after the approval request returns (Next's `after()`, up to 300 seconds per request), and
+a longer run resumes on the run page's next poll. A lease in the database makes sure only one
+worker pays, even across instances. This path isn't tested end to end yet.
+
+**Seed the hosted demo** from your machine, against the hosted database and with the host's
+`DATA_ENCRYPTION_KEY` (salaries are stored encrypted with it):
+
+```bash
+cd apps/web
+MONGODB_URI=<atlas uri> DATA_ENCRYPTION_KEY=<same key> NEXT_PUBLIC_SOLANA_CLUSTER=devnet \
+  pnpm seed --fund-from ../../.keys/employer.json --app-url https://<your demo>
+```
+
+The built-in test wallet stays on (set `NEXT_PUBLIC_ENABLE_TEST_WALLET=false` to hide it), so
+judges can try every role without installing a wallet.
+
 ## Tests
 
 ```bash

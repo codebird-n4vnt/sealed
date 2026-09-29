@@ -32,7 +32,7 @@ const SYSTEM_PROGRAM_ADDRESS = '11111111111111111111111111111111' as Address;
 // Anchor instruction discriminators, from target/idl/sealed_vault.json.
 const INIT_COMPANY = new Uint8Array([4, 20, 200, 152, 94, 207, 211, 98]);
 const WRAP = new Uint8Array([178, 40, 10, 189, 228, 129, 186, 140]);
-const UNWRAP = new Uint8Array([126, 175, 198, 14, 212, 69, 50, 44]);
+export const UNWRAP_DISCRIMINATOR = new Uint8Array([126, 175, 198, 14, 212, 69, 50, 44]);
 
 export const VAULT_ERRORS: Record<number, string> = {
   6000: 'Amount must be greater than zero',
@@ -142,7 +142,7 @@ export async function getUnwrapInstruction(input: {
       readonly(TOKEN_2022_PROGRAM_ADDRESS),
       readonly(input.usdcTokenProgram ?? TOKEN_PROGRAM_ADDRESS),
     ],
-    data: amountData(UNWRAP, input.amount),
+    data: amountData(UNWRAP_DISCRIMINATOR, input.amount),
   };
 }
 

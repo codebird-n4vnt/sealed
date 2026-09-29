@@ -12,7 +12,10 @@
  * - Only these programs: Compute Budget, System, Associated Token, Token-2022, ZK ElGamal Proof.
  * - System: only CreateAccount funded by the sponsor, for ZK proof context accounts, at no more
  *   than rent-exempt lamports, at most two per transaction.
- * - Associated Token: only creating the employee's own account for the company mint.
+ * - Associated Token: only creating the employee's own account for the company mint (and, for a
+ *   USDC-backed company, their own USDC account).
+ * - Sealed Vault (USDC-backed companies): only `unwrap` from the employee's own token account to
+ *   their own USDC account, i.e. cashing out their pay.
  * - Token-2022: only Reallocate and the confidential Configure / Deposit / Withdraw /
  *   ApplyPendingBalance instructions, all on the employee's own token account.
  * - ZK proof program: verify instructions (context authority must be the sponsor, so only the
@@ -44,6 +47,8 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ADDRESS,
   TOKEN_2022_PROGRAM_ADDRESS,
 } from '@solana-program/token-2022';
+
+import { SEALED_VAULT_PROGRAM_ADDRESS, TOKEN_PROGRAM_ADDRESS, UNWRAP_DISCRIMINATOR } from './vault';
 
 export const SYSTEM_PROGRAM_ADDRESS = '11111111111111111111111111111111' as Address;
 export const COMPUTE_BUDGET_PROGRAM_ADDRESS = 'ComputeBudget111111111111111111111111111111' as Address;
@@ -90,6 +95,8 @@ export type SponsorPolicy = {
   maxComputeUnitPrice?: bigint;
   /** Highest total priority fee the sponsor will pay in a v1 transaction, in lamports. */
   maxPriorityFeeLamports?: bigint;
+  /** For a USDC-backed company: the USDC mint and the employee's own USDC token account. */
+  usdc?: { mint: Address; account: Address };
 };
 
 export class SponsorPolicyError extends Error {
@@ -180,10 +187,30 @@ export function checkSponsoredTransaction(
           reject(`${at}: only creating a token account is allowed`);
         }
         // Accounts: payer, associated token, owner, mint, system program, token program.
-        if (account(1) !== policy.token || account(2) !== policy.owner || account(3) !== policy.mint) {
+        const companyToken =
+          account(1) === policy.token && account(3) === policy.mint && account(5) === TOKEN_2022_PROGRAM_ADDRESS;
+        const usdcAccount =
+          !!policy.usdc &&
+          account(1) === policy.usdc.account &&
+          account(3) === policy.usdc.mint &&
+          account(5) === TOKEN_PROGRAM_ADDRESS;
+        if (account(2) !== policy.owner || !(companyToken || usdcAccount)) {
           reject(`${at}: may only create the employee's own token account for this company`);
         }
-        if (account(5) !== TOKEN_2022_PROGRAM_ADDRESS) reject(`${at}: token account must use Token-2022`);
+        break;
+      }
+
+      case SEALED_VAULT_PROGRAM_ADDRESS: {
+        if (!policy.usdc) reject(`${at}: this company isn't backed by the Sealed Vault`);
+        const isUnwrap = data.length === 16 && UNWRAP_DISCRIMINATOR.every((byte, i) => data[i] === byte);
+        if (!isUnwrap) reject(`${at}: only unwrap is allowed on the Sealed Vault`);
+        // Accounts: holder, company, company mint, USDC mint, USDC vault, holder token, recipient USDC, ...
+        if (account(0) !== policy.owner || account(2) !== policy.mint || account(5) !== policy.token) {
+          reject(`${at}: may only unwrap the employee's own tokens`);
+        }
+        if (account(3) !== policy.usdc!.mint || account(6) !== policy.usdc!.account) {
+          reject(`${at}: may only pay out to the employee's own USDC account`);
+        }
         break;
       }
 

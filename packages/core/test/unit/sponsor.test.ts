@@ -33,6 +33,7 @@ import {
   ZK_ELGAMAL_PROOF_PROGRAM_ADDRESS,
   type SponsorPolicy,
 } from '../../src/sponsor';
+import { getUnwrapInstruction, TOKEN_PROGRAM_ADDRESS } from '../../src/vault';
 
 let policy: SponsorPolicy;
 let sponsor: Address, owner: Address, token: Address, mint: Address, stranger: Address, context: Address;
@@ -186,5 +187,59 @@ describe('checkSponsoredTransaction refuses', () => {
   it('unknown programs', async () => {
     const program = (await generateKeyPairSigner()).address;
     refuses([{ programAddress: program, data: new Uint8Array([1]) }], /not allowed/);
+  });
+});
+
+describe('checkSponsoredTransaction, cashing out a USDC-backed company token', () => {
+  let usdcMint: Address, usdcAccount: Address, strangerUsdc: Address;
+  let usdcPolicy: SponsorPolicy;
+
+  beforeAll(async () => {
+    [usdcMint, usdcAccount, strangerUsdc] = (await Promise.all([generateKeyPairSigner(), generateKeyPairSigner(), generateKeyPairSigner()])).map(
+      s => s.address,
+    ) as [Address, Address, Address];
+    usdcPolicy = { ...policy, usdc: { mint: usdcMint, account: usdcAccount } };
+  });
+
+  const createUsdcAccount = (ata: Address = usdcAccount, tokenOwner: Address = owner) =>
+    getCreateAssociatedTokenIdempotentInstruction({
+      payer: signer(sponsor),
+      ata,
+      owner: tokenOwner,
+      mint: usdcMint,
+      tokenProgram: TOKEN_PROGRAM_ADDRESS,
+    });
+  const unwrap = (overrides: { holderToken?: Address; recipient?: Address } = {}) =>
+    getUnwrapInstruction({
+      holder: signer(owner),
+      companyMint: mint,
+      usdcMint,
+      holderToken: overrides.holderToken ?? token,
+      recipientUsdc: overrides.recipient ?? usdcAccount,
+      amount: 1_000_000n,
+    });
+
+  it("allows creating the employee's USDC account and unwrapping into it", async () => {
+    const instruction = await unwrap();
+    expect(() => checkSponsoredTransaction(wire([createUsdcAccount(), instruction]), usdcPolicy)).not.toThrow();
+  });
+
+  it('refuses paying out to anyone else', async () => {
+    const instruction = await unwrap({ recipient: strangerUsdc });
+    expect(() => checkSponsoredTransaction(wire([instruction]), usdcPolicy)).toThrow(/own USDC account/);
+  });
+
+  it("refuses unwrapping someone else's tokens", async () => {
+    const instruction = await unwrap({ holderToken: stranger });
+    expect(() => checkSponsoredTransaction(wire([instruction]), usdcPolicy)).toThrow(/own tokens/);
+  });
+
+  it("refuses a USDC account for someone else", () => {
+    expect(() => checkSponsoredTransaction(wire([createUsdcAccount(strangerUsdc, stranger)]), usdcPolicy)).toThrow(SponsorPolicyError);
+  });
+
+  it('refuses the vault altogether for a company without USDC backing', async () => {
+    const instruction = await unwrap();
+    expect(() => checkSponsoredTransaction(wire([instruction]), policy)).toThrow(/isn't backed/);
   });
 });

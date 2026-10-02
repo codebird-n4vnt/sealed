@@ -8,7 +8,7 @@ import { api, errorMessage } from '@/lib/client/api';
 import { DEMO_AUDITOR_KEY_STORAGE } from '@/lib/client/demo';
 import { TEST_WALLET_NAME, testWallet, type TestIdentity } from '@/lib/client/test-wallet';
 
-import { Button, ErrorText, buttonClass } from './ui';
+import { ArrowDot, Button, ErrorText, buttonClass } from './ui';
 
 type Role = 'admin' | 'employee' | 'accountant';
 
@@ -76,6 +76,7 @@ export function DemoLauncher({ enabled }: { enabled: boolean }) {
     return (
       <Link href="/company" className={buttonClass('primary', 'lg')}>
         Open the dashboard
+        <ArrowDot />
       </Link>
     );
   }
@@ -128,6 +129,7 @@ export function DemoLauncher({ enabled }: { enabled: boolean }) {
         className={`${buttonClass('primary', 'lg')} aria-expanded:bg-[#4b4b56]`}
       >
         Try the live demo
+        <ArrowDot />
       </button>
 
       {open && (

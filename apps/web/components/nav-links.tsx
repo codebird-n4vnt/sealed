@@ -9,7 +9,7 @@ const NAV = [
   { href: '/audit', label: 'Accountant' },
 ];
 
-/** The app's sections, with the current one marked. */
+/** The app's sections; the current one is darker and marked with a dot. */
 export function NavLinks({ className = '' }: { className?: string }) {
   const pathname = usePathname();
   return (
@@ -21,11 +21,17 @@ export function NavLinks({ className = '' }: { className?: string }) {
             key={item.href}
             href={item.href}
             aria-current={current ? 'page' : undefined}
-            className={`shrink-0 rounded-full px-3.5 py-1.5 transition-colors ${
-              current ? 'bg-ink text-white' : 'text-muted hover:bg-surface-2 hover:text-ink'
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 transition-colors ${
+              current ? 'font-medium text-ink' : 'text-muted hover:text-ink'
             }`}
           >
             {item.label}
+            {current && (
+              <svg viewBox="0 0 12 12" className="size-3" aria-hidden>
+                <circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" strokeWidth="1.2" />
+                <circle cx="6" cy="6" r="2" fill="currentColor" />
+              </svg>
+            )}
           </Link>
         );
       })}

@@ -42,9 +42,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         </div>
         <Providers>
           <header className="sticky top-0 z-30 border-b border-line/70 bg-white/70 backdrop-blur-xl">
-            <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
+            <div className="relative mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
               <Logo />
-              <NavLinks className="ml-4 hidden sm:flex" />
+              <NavLinks className="ml-4 hidden sm:flex lg:absolute lg:left-1/2 lg:ml-0 lg:-translate-x-1/2" />
               <div className="ml-auto flex items-center gap-3">
                 <span className="hidden items-center gap-2 rounded-full border border-line bg-white/60 px-3 py-1 text-xs text-muted md:inline-flex">
                   <span className="size-1.5 rounded-full bg-ok" />

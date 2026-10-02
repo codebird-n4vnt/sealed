@@ -26,6 +26,17 @@ const SIZE: Record<ButtonSize, string> = {
 export const buttonClass = (variant: ButtonVariant = 'primary', size: ButtonSize = 'md') =>
   `inline-flex items-center justify-center gap-2 rounded-full font-medium tracking-tight transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 ${SIZE[size]} ${BUTTON[variant]}`;
 
+/** A white circle with an arrow, at the end of a call-to-action pill. */
+export function ArrowDot() {
+  return (
+    <span aria-hidden className="-mr-4 ml-1 grid size-10 place-items-center rounded-full bg-white text-ink">
+      <svg viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M5 3v6.5a1.5 1.5 0 0 0 1.5 1.5H12M9.5 8.5 12 11l-2.5 2.5" />
+      </svg>
+    </span>
+  );
+}
+
 export function Button({
   variant = 'primary',
   size = 'md',

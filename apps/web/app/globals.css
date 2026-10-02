@@ -166,12 +166,23 @@ body {
     }
   }
 
+  /* A card hovering gently. */
+  .float-y {
+    animation: float-y 7s ease-in-out infinite alternate;
+  }
+  @keyframes float-y {
+    to {
+      transform: translateY(-10px);
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .aurora,
     .aurora-blob,
     .word-in,
     .warp-in,
-    .pop-in {
+    .pop-in,
+    .float-y {
       animation: none;
     }
   }

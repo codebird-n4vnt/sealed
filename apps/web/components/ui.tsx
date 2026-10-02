@@ -6,28 +6,40 @@ import { formatAmount } from '@sealed/core';
 
 import { explorerUrl } from '@/lib/config';
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type ButtonVariant = 'primary' | 'accent' | 'secondary' | 'ghost' | 'danger';
+type ButtonSize = 'md' | 'lg';
 
 const BUTTON: Record<ButtonVariant, string> = {
-  primary: 'bg-ink text-bg hover:opacity-90',
+  primary: 'bg-ink text-white hover:bg-[#3d3d47]',
+  accent: 'bg-accent text-white hover:bg-[#4a4ac4]',
   secondary: 'bg-surface text-ink border border-line hover:bg-surface-2',
   ghost: 'text-muted hover:text-ink hover:bg-surface-2',
   danger: 'bg-surface text-bad border border-line hover:bg-bad-soft',
 };
 
+const SIZE: Record<ButtonSize, string> = {
+  md: 'h-10 px-4 text-sm',
+  lg: 'h-14 px-7 text-lg',
+};
+
+/** The shared look of buttons, for links styled as buttons too. */
+export const buttonClass = (variant: ButtonVariant = 'primary', size: ButtonSize = 'md') =>
+  `inline-flex items-center justify-center gap-2 rounded-full font-medium tracking-tight transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 ${SIZE[size]} ${BUTTON[variant]}`;
+
 export function Button({
   variant = 'primary',
+  size = 'md',
   loading = false,
   className = '',
   children,
   disabled,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant; loading?: boolean }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant; size?: ButtonSize; loading?: boolean }) {
   return (
     <button
       {...props}
       disabled={disabled || loading}
-      className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${BUTTON[variant]} ${className}`}
+      className={`${buttonClass(variant, size)} ${className}`}
     >
       {loading && <Spinner />}
       {children}
@@ -58,11 +70,13 @@ export function Card({
   className?: string;
 }) {
   return (
-    <section className={`rounded-2xl border border-line bg-surface p-5 sm:p-6 ${className}`}>
+    <section
+      className={`rounded-3xl border border-line bg-surface p-5 shadow-[0_1px_2px_rgba(20,20,40,0.03),0_16px_40px_-24px_rgba(20,20,40,0.14)] sm:p-7 ${className}`}
+    >
       {(title || actions) && (
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            {title && <h2 className="text-base font-semibold">{title}</h2>}
+            {title && <h2 className="text-lg font-semibold tracking-tight">{title}</h2>}
             {description && <p className="mt-1 text-sm text-muted">{description}</p>}
           </div>
           {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
@@ -73,26 +87,26 @@ export function Card({
   );
 }
 
-type Tone = 'neutral' | 'ok' | 'warn' | 'bad' | 'wax';
+type Tone = 'neutral' | 'ok' | 'warn' | 'bad' | 'accent';
 
 const TONE: Record<Tone, string> = {
   neutral: 'bg-surface-2 text-muted border-line',
   ok: 'bg-ok-soft text-ok border-transparent',
   warn: 'bg-warn-soft text-warn border-transparent',
   bad: 'bg-bad-soft text-bad border-transparent',
-  wax: 'bg-wax-soft text-wax border-transparent',
+  accent: 'bg-accent-soft text-accent border-transparent',
 };
 
 export function Badge({ tone = 'neutral', children }: { tone?: Tone; children: ReactNode }) {
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${TONE[tone]}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium ${TONE[tone]}`}>
       {children}
     </span>
   );
 }
 
 export function Notice({ tone = 'neutral', children }: { tone?: Tone; children: ReactNode }) {
-  return <div className={`rounded-lg border px-3 py-2 text-sm ${TONE[tone]}`}>{children}</div>;
+  return <div className={`rounded-2xl border px-4 py-3 text-sm ${TONE[tone]}`}>{children}</div>;
 }
 
 export function ErrorText({ error }: { error: string | null | undefined }) {
@@ -118,16 +132,16 @@ export function Input({ className = '', ...props }: InputHTMLAttributes<HTMLInpu
   return (
     <input
       {...props}
-      className={`h-10 w-full rounded-lg border border-line bg-surface px-3 text-sm outline-none placeholder:text-muted/70 focus:border-ink ${className}`}
+      className={`h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-sm outline-none transition placeholder:text-muted/70 focus:border-accent focus:ring-4 focus:ring-accent/15 ${className}`}
     />
   );
 }
 
 export function Stat({ label, value, hint }: { label: string; value: ReactNode; hint?: ReactNode }) {
   return (
-    <div className="min-w-0 rounded-xl bg-surface-2 p-4">
+    <div className="min-w-0 rounded-2xl bg-surface-2 p-4 sm:p-5">
       <div className="text-xs font-medium uppercase tracking-wide text-muted">{label}</div>
-      <div className="mt-1 truncate text-xl font-semibold tabular">{value}</div>
+      <div className="mt-1.5 truncate text-2xl font-semibold tracking-tight tabular">{value}</div>
       {hint && <div className="mt-1 text-xs text-muted">{hint}</div>}
     </div>
   );
@@ -152,7 +166,7 @@ export function Amount({ value, symbol, decimals = 6 }: { value: bigint | string
 /** Shown instead of an amount the viewer can't decrypt. Never shows 0 for a locked balance. */
 export function Sealed({ label = 'Confidential' }: { label?: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 text-muted">
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-0.5 text-sm font-normal tracking-normal text-muted">
       <LockIcon /> {label}
     </span>
   );
@@ -195,7 +209,7 @@ export function AddressLink({ address, kind = 'address', label }: { address: str
 
 export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <div className="rounded-xl border border-dashed border-line px-4 py-8 text-center">
+    <div className="rounded-2xl border border-dashed border-line px-4 py-10 text-center">
       <p className="text-sm font-medium">{title}</p>
       {children && <div className="mt-2 text-sm text-muted">{children}</div>}
     </div>
@@ -206,8 +220,8 @@ export function PageHeader({ eyebrow, title, children }: { eyebrow?: ReactNode; 
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
-        {eyebrow && <div className="mb-1 text-sm text-muted">{eyebrow}</div>}
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
+        {eyebrow && <div className="mb-2 text-sm text-muted">{eyebrow}</div>}
+        <h1 className="text-3xl font-medium tracking-[-0.04em] sm:text-5xl">{title}</h1>
       </div>
       {children && <div className="flex flex-wrap gap-2">{children}</div>}
     </div>

@@ -1,14 +1,19 @@
 @import 'tailwindcss';
 
+/* A white, quiet UI: ink type, slate greys, and a soft lavender glow for atmosphere. Light only. */
 :root {
-  --bg: #f6f5f1;
+  --bg: #ffffff;
   --surface: #ffffff;
-  --surface-2: #faf9f6;
-  --ink: #1c1917;
-  --muted: #6b645c;
-  --line: #e7e3dc;
+  --surface-2: #f6f6f9;
+  --ink: #0b0b0f;
+  --muted: #676a80;
+  /* Large display text only: 3:1 on white, enough from 24px up. */
+  --soft: #8e90a6;
+  --line: #ebebf1;
+  --accent: #5b5bd6;
+  --accent-soft: #eeeefc;
+  /* The seal in the logo. */
   --wax: #b8492f;
-  --wax-soft: #f7e9e3;
   --ok: #15803d;
   --ok-soft: #e8f5ec;
   --warn: #a15c07;
@@ -18,43 +23,24 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #100f0e;
-    --surface: #1a1816;
-    --surface-2: #211e1b;
-    --ink: #f4f1ec;
-    --muted: #a39b93;
-    --line: #2f2b27;
-    --wax: #e27a5a;
-    --wax-soft: #33201a;
-    --ok: #5dd28a;
-    --ok-soft: #16281d;
-    --warn: #f0b458;
-    --warn-soft: #2d2413;
-    --bad: #f47a7a;
-    --bad-soft: #321a1a;
-    color-scheme: dark;
-  }
-}
-
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-ink: var(--ink);
   --color-muted: var(--muted);
+  --color-soft: var(--soft);
   --color-line: var(--line);
-  --color-wax: var(--wax);
-  --color-wax-soft: var(--wax-soft);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
   --color-ok: var(--ok);
   --color-ok-soft: var(--ok-soft);
   --color-warn: var(--warn);
   --color-warn-soft: var(--warn-soft);
   --color-bad: var(--bad);
   --color-bad-soft: var(--bad-soft);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
 
 body {
@@ -62,12 +48,131 @@ body {
   color: var(--ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
 }
 
 ::selection {
-  background: var(--wax-soft);
+  background: var(--accent-soft);
 }
 
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+/* In the components layer, so utilities (position, z-index) can override these. */
+@layer components {
+  /* The lavender glow: blurred blobs that drift slowly. */
+  .aurora {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    animation: aurora-in 1.6s ease-out both;
+  }
+  .aurora-faint {
+    opacity: 0.5;
+  }
+  .aurora-blob {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(64px);
+    will-change: transform;
+    animation: aurora-drift 22s ease-in-out infinite alternate;
+  }
+  .aurora-blob:nth-child(1) {
+    left: 6%;
+    top: 6%;
+    width: 56%;
+    height: 72%;
+    background: radial-gradient(closest-side, #c3c5fa, transparent);
+  }
+  .aurora-blob:nth-child(2) {
+    left: 36%;
+    top: 16%;
+    width: 44%;
+    height: 60%;
+    background: radial-gradient(closest-side, #d2d0fb, transparent);
+    animation-duration: 28s;
+    animation-delay: -7s;
+  }
+  .aurora-blob:nth-child(3) {
+    right: 2%;
+    top: 22%;
+    width: 34%;
+    height: 48%;
+    background: radial-gradient(closest-side, #dcdffd, transparent);
+    animation-duration: 18s;
+    animation-delay: -12s;
+  }
+  @keyframes aurora-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes aurora-drift {
+    0% {
+      transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+    }
+    50% {
+      transform: translate3d(5%, -4%, 0) scale(1.08) rotate(8deg);
+    }
+    100% {
+      transform: translate3d(-4%, 3%, 0) scale(0.95) rotate(-6deg);
+    }
+  }
+
+  /* A headline word swapping in. */
+  .word-in {
+    animation: word-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  @keyframes word-in {
+    from {
+      opacity: 0;
+      filter: blur(12px);
+      transform: translateY(0.18em);
+    }
+  }
+
+  /* A card springing open from the button that opened it. */
+  .warp-in {
+    transform-origin: bottom right;
+    animation: warp-in 0.55s cubic-bezier(0.2, 0.9, 0.25, 1.12) both;
+  }
+  @keyframes warp-in {
+    from {
+      opacity: 0;
+      filter: blur(8px);
+      transform: perspective(1200px) rotateX(16deg) rotateY(-10deg) scale(0.88) translateY(28px);
+    }
+  }
+
+  /* Menus and smaller surfaces. */
+  .pop-in {
+    transform-origin: top right;
+    animation: pop-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      filter: blur(3px);
+      transform: translateY(-4px) scale(0.97);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .aurora,
+    .aurora-blob,
+    .word-in,
+    .warp-in,
+    .pop-in {
+      animation: none;
+    }
+  }
 }

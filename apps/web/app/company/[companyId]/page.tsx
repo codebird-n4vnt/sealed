@@ -47,11 +47,11 @@ function Dashboard({ account }: { account: UiWalletAccount }) {
         eyebrow={<Link href="/company" className="hover:underline">Companies</Link>}
         title={company.name}
       >
-        <Badge tone="wax">{company.symbol}</Badge>
+        <Badge tone="accent">{company.symbol}</Badge>
         {company.status === 'ready' ? <Badge tone="ok">Ready</Badge> : <Badge tone="warn">Setup needed</Badge>}
       </PageHeader>
       {created && (
-        <Notice tone="wax">
+        <Notice tone="accent">
           Your auditor key file was downloaded. Give it to your accountant and keep a backup: it&apos;s the only way to
           read payment amounts without your team&apos;s wallets, and Sealed doesn&apos;t keep a copy.
         </Notice>

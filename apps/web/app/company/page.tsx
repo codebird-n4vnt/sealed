@@ -70,7 +70,7 @@ function CreateCompany() {
           </Field>
         </div>
         {vault && (
-          <label className="flex items-start gap-3 rounded-lg border border-line bg-surface-2 p-3 text-sm">
+          <label className="flex items-start gap-3 rounded-2xl border border-line bg-surface-2 p-4 text-sm">
             <input type="checkbox" className="mt-1" checked={usdc} onChange={e => setUsdc(e.target.checked)} />
             <span>
               <span className="font-medium">Back the payroll token 1:1 with USDC</span>
@@ -119,7 +119,7 @@ function Companies() {
             <Link
               key={company.id}
               href={`/company/${company.id}`}
-              className="flex items-center justify-between rounded-2xl border border-line bg-surface p-5 hover:border-ink"
+              className="flex items-center justify-between rounded-3xl border border-line bg-surface p-6 transition hover:-translate-y-0.5 hover:border-soft hover:shadow-[0_18px_40px_-24px_rgba(20,20,40,0.25)]"
             >
               <div>
                 <div className="font-semibold">{company.name}</div>

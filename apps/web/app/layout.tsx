@@ -1,12 +1,18 @@
 import type { Metadata } from 'next';
+import { Geist, Geist_Mono } from 'next/font/google';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+import { Aurora } from '@/components/aurora';
+import { NavLinks } from '@/components/nav-links';
 import { WalletButton } from '@/components/wallet-button';
 import { CLUSTER } from '@/lib/config';
 
 import './globals.css';
 import { Providers } from './providers';
+
+const sans = Geist({ subsets: ['latin'], variable: '--font-geist' });
+const mono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' });
 
 export const metadata: Metadata = {
   title: 'Sealed · Private payroll on Solana',
@@ -16,7 +22,7 @@ export const metadata: Metadata = {
 
 function Logo() {
   return (
-    <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
+    <Link href="/" className="flex items-center gap-2 text-[17px] font-semibold tracking-tight">
       <svg viewBox="0 0 32 32" className="size-7" aria-hidden>
         <circle cx="16" cy="16" r="14" fill="var(--wax)" />
         <circle cx="16" cy="16" r="9.5" fill="none" stroke="var(--bg)" strokeWidth="1.5" strokeDasharray="2 2.2" />
@@ -27,44 +33,30 @@ function Logo() {
   );
 }
 
-const NAV = [
-  { href: '/company', label: 'Company' },
-  { href: '/me', label: 'My pay' },
-  { href: '/audit', label: 'Accountant' },
-];
-
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
-      <body className="min-h-dvh">
+    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
+      <body className="relative isolate min-h-dvh">
+        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[480px] [mask-image:linear-gradient(to_bottom,black,transparent)]">
+          <Aurora faint />
+        </div>
         <Providers>
-          <header className="sticky top-0 z-10 border-b border-line bg-bg/85 backdrop-blur">
+          <header className="sticky top-0 z-30 border-b border-line/70 bg-white/70 backdrop-blur-xl">
             <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
               <Logo />
-              <nav className="hidden items-center gap-1 text-sm sm:flex">
-                {NAV.map(item => (
-                  <Link key={item.href} href={item.href} className="rounded-lg px-3 py-2 text-muted hover:bg-surface-2 hover:text-ink">
-                    {item.label}
-                  </Link>
-                ))}
-              </nav>
+              <NavLinks className="ml-4 hidden sm:flex" />
               <div className="ml-auto flex items-center gap-3">
-                <span className="hidden rounded-full border border-line px-2 py-0.5 text-xs text-muted md:inline">
+                <span className="hidden items-center gap-2 rounded-full border border-line bg-white/60 px-3 py-1 text-xs text-muted md:inline-flex">
+                  <span className="size-1.5 rounded-full bg-ok" />
                   {CLUSTER === 'devnet' ? 'Devnet' : 'Local network'} · test funds only
                 </span>
                 <WalletButton />
               </div>
             </div>
-            <nav className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 pb-2 text-sm sm:hidden">
-              {NAV.map(item => (
-                <Link key={item.href} href={item.href} className="shrink-0 rounded-lg px-3 py-1.5 text-muted hover:bg-surface-2">
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
+            <NavLinks className="mx-auto flex max-w-6xl overflow-x-auto px-4 pb-2.5 sm:hidden" />
           </header>
-          <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">{children}</main>
-          <footer className="mx-auto max-w-6xl px-4 pb-10 text-xs text-muted sm:px-6">
+          <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">{children}</main>
+          <footer className="mx-auto max-w-6xl border-t border-line px-4 py-8 text-xs leading-relaxed text-muted sm:px-6">
             Amounts and balances are encrypted on-chain with Solana Confidential Balances. Addresses, and the
             fact that a payment happened, stay public.
           </footer>

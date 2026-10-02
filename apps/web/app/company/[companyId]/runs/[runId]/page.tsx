@@ -74,7 +74,7 @@ function Run() {
       </div>
 
       {sample?.signature && (
-        <Notice tone="wax">
+        <Notice tone="accent">
           See what the public sees:{' '}
           <a className="underline" href={explorerUrl('tx', sample.signature)} target="_blank" rel="noreferrer">
             {sample.name}&apos;s payment on the explorer

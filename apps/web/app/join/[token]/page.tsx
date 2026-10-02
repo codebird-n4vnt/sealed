@@ -100,7 +100,7 @@ function JoinPage() {
   return (
     <div className="mx-auto grid max-w-xl gap-6">
       <div>
-        <p className="text-sm font-medium text-wax">Invitation</p>
+        <p className="text-sm font-medium text-accent">Invitation</p>
         <h1 className="mt-1 text-3xl font-semibold tracking-tight">
           {invite.company.name} wants to pay you privately
         </h1>

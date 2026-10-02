@@ -185,10 +185,17 @@ worker pays, even across instances. This path isn't tested end to end yet.
 `DATA_ENCRYPTION_KEY` (salaries are stored encrypted with it):
 
 ```bash
+node scripts/devnet-rpc-proxy.mjs &   # paces requests; the seed has no retries of its own
 cd apps/web
 MONGODB_URI=<atlas uri> DATA_ENCRYPTION_KEY=<same key> NEXT_PUBLIC_SOLANA_CLUSTER=devnet \
+  NEXT_PUBLIC_RPC_URL=http://127.0.0.1:8898 NEXT_PUBLIC_RPC_SUBSCRIPTIONS_URL=wss://api.devnet.solana.com \
   pnpm seed --fund-from ../../.keys/employer.json --app-url https://<your demo>
 ```
+
+Set the RPC variables even without the proxy (`NEXT_PUBLIC_RPC_URL=https://api.devnet.solana.com`):
+the seed also reads `apps/web/.env.local`, and an RPC set there for local development would win
+otherwise. Seeding straight against the public RPC can stop halfway on a rate limit (HTTP 429),
+leaving a half-built company whose test SOL stays in its payroll vault.
 
 The built-in test wallet stays on (set `NEXT_PUBLIC_ENABLE_TEST_WALLET=false` to hide it), so
 visitors can try every role without installing a wallet.
